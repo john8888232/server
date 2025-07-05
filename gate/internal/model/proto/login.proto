@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package proto;
+option go_package = "./;proto";
+
+message PlayerInfo {
+  string username = 1;       // 玩家名
+  string nickname = 2;       // 玩家昵称
+  string avatar = 3;         // 玩家头像
+  int32 vip = 4;            // vip等级
+  double balance = 5;        // 玩家余额
+  string currency = 6;       // 币种
+}
+
+//0x11001
+message LoginReq {
+  string loginname = 1;     // 登录名
+  string token = 2;         // 认证token
+  string game_type = 3;     // 游戏类型
+  uint32 version = 4;       // 客户端版本
+  string client_ip = 5;     // 客户端IP (Gateway添加)
+}
+
+// 0x11002 - 登录响应
+message LoginResp {
+  string loginname = 1;     // 登录名
+  int32 code = 2;           // 0: 成功, 其他: 失败
+  string message = 3;       // 错误信息
+  PlayerInfo info = 4;      // 玩家信息
+}
+
+
+// 0x11000 - 心跳包
+message HeartBeat{
+  int64 timestamp = 1;
+}
+
+//0x10001 gate -> game
+message ConnClose {
+}
+
+// 0x11006 - 踢出玩家通知
+// 一直收不到包更新玩家时间戳的用户180s后会被踢出,或者被顶号的玩家也会被踢出
+message KickPlayerNotify {
+  enum errtype{
+    NORMAL = 0;             // 正常
+    INACTIVE = 1;           // 长时间未活动
+    LOGINOTHERPLACE = 2;    // 在其他地方登录
+    INVALID = 3;            // 无效
+  }
+  string sessionId = 1;     // 会话ID
+  errtype reason = 2;       // 踢出原因
+}

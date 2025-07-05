@@ -1,0 +1,187 @@
+syntax = "proto3";
+
+package proto;
+
+message BetRecord {
+  int32 playType = 1;        // 下注类型 mines_pro有两种下注类型,1,2分别表示下左边和右边
+  double amount = 2;         // 下注金额
+}
+
+message ReckonRecord {
+  int32 playType = 1;       // 类型 mines_pro有两种下注类型,1,2分别表示下左边和右边
+  double amount = 2;        // 派奖金额
+  double multi = 3;
+}
+
+message PlayerInfo {
+  string username = 1;       // 玩家名
+  string nickname = 2;       // 玩家昵称
+  string avatar = 3;         // 玩家头像
+  int32 vip = 4;             // vip等级
+  double balance = 5;        // 玩家余额
+  string currency = 6;       // 币种
+}
+
+// 玩家的游戏快照信息
+message PlayerInfoSnap {
+  PlayerInfo info = 1;                      // 玩家基本信息
+  repeated BetRecord bets = 2;              // 玩家下注记录
+  repeated ReckonRecord reckons = 3;        // 玩家派奖记录
+}
+
+message GameResult {
+  int32 result = 1;         // mines_pro 1-未翻开 2-已翻开(星星) 3-已翻开(炸弹) 4-未翻开(星星) 5-未翻开(炸弹)
+  double multi = 2;         // mines_pro用,倍数
+  int32 index = 3;          // mines_pro用,索引
+}
+
+// ========== 基础协议 ==========
+
+// 0x11000 - 心跳包
+message HeartBeat{
+  int64 timestamp = 1;
+}
+
+// 0x11001 - 登录请求
+// 在close tab或者断网后需要重新发送LOGIN_REQ到服务器
+message LoginReq {
+  string loginname = 1;     // 登录名
+  string token = 2;         // 认证token
+  string game_type = 3;     // 游戏类型
+  uint32 version = 4;       // 客户端版本
+  string client_ip = 5;     // 客户端IP (Gateway添加)
+}
+
+// 0x11002 - 登录响应
+message LoginResp {
+  string loginname = 1;     // 登录名
+  int32 code = 2;           // 0: 成功, 其他: 失败
+  string message = 3;       // 错误信息
+  PlayerInfo info = 4;      // 玩家信息
+}
+
+// 0x11003 - 登出请求
+message LogoutReq {
+  string loginname = 1;     // 登录名
+}
+
+// 0x11004 - 登出响应
+message LogoutRes {
+  string loginname = 1;     // 登录名
+  int32 code = 2;           // 0-成功 1-失败
+  string msg = 3;           // 消息
+}
+
+// 0x11006 - 踢出玩家通知
+message KickPlayerNotify {
+  string sessionId = 1;     // 会话ID
+  int32 reason = 2;         // 踢出原因 0-正常 1005-无效token 1006-长时间未活动 1007-在其他地方登录
+}
+
+// 0x11008 - 游戏快照通知
+message GameSnapshotNotify {
+  string roundId = 1;                       // 游戏回合ID
+  string gameType = 2;                      // 游戏类型
+  int32 status = 3;                         // 游戏状态 0-init 1-start jetton 2-stop jetton 3-settled
+  int64 remainTime = 4;                     // 游戏剩余时间（秒）
+  int32 curIndex = 5;						            // 当前索引(mines_pro用)状态2有效
+  double curMulti = 6;						          // 当前倍数(mines_pro用)状态2有效
+  repeated GameResult result = 7;		        // 游戏结果 状态1、2、3有效
+}
+
+// ========== 扫雷游戏协议 ==========
+
+// 0x20001 - 下注请求
+message MinesPlaceBetReq {
+  string loginname = 1;     // 玩家登录名
+  string roundId = 2;       // 游戏回合ID
+  int32 playType = 3;       // 下注类型 1-左边 2-右边
+  double amount = 4;        // 下注金额
+}
+
+// 0x20002 - 下注响应
+message MinesPlaceBetRes {
+  int32 code = 1;           // 0-成功 其他-失败
+  string message = 2;       // 错误信息
+  string roundId = 3;       // 游戏回合ID
+  BetRecord bet = 4;		
+  double balance = 5;       // 下注后余额
+}
+
+// 0x20003 - 设置自动兑现请求
+message MinesAutoCashReq {
+  string loginname = 1;     // 玩家登录名
+  string roundId = 2;
+  int32 playType = 3;        // 兑现玩法 1-左边 2-右边
+  int32 enable = 4;          // 是否启用自动兑现 0-不启用 1-启用
+  int32 grid = 5;   		     // 目标格子（当达到时自动兑现）
+}
+
+// 0x20004 - 设置自动兑现响应
+message MinesAutoCashRes {
+  string roundId = 1;		
+  int32 code = 2;           // 0-成功 其他-失败
+  string message = 3;       // 错误信息
+  int32 enable = 4;         // 0-不启用 1-启用
+  int32 grid = 5;   		    // 目标格子
+  int32 playType = 6;       // 兑现玩法 1-左边 2-右边
+}
+
+// 0x20005 - 手动兑现请求
+message MinesCashReq {
+  string loginname = 1;     // 玩家登录名
+  string roundId = 2;       // 游戏回合ID
+  int32 playType = 3;       // 兑现玩法 1-左边 2-右边
+}
+
+// 0x20006 - 兑现响应(手动自动通用)
+message MinesCashRes {
+  string roundId = 1;
+  int32 code = 2;           // 0-成功 其他-失败
+  string message = 3;       // 错误信息
+  ReckonRecord reckon = 4;  
+  double balance = 5;       // 兑现后余额
+  int32 playType = 6;       // 兑现玩法 1-左边 2-右边
+}
+
+// 0x20007 - 取消下注请求
+message MinesCancelBetReq {
+  string loginname = 1;     // 玩家登录名
+  string roundId = 2;       // 游戏回合ID
+  int32 playType = 3;       // 下注类型 1-左边 2-右边 0-全部取消
+}
+
+// 0x20008 - 取消下注响应
+message MinesCancelBetRes {
+  string roundId = 1;       // 游戏回合ID
+  int32 code = 2;           // 0-成功 其他-失败
+  string message = 3;       // 错误信息
+  double refundAmount = 4;  // 退还金额
+  double balance = 5;       // 取消后余额
+  int32 playType = 6;       // 下注类型 1-左边 2-右边 0-全部取消
+}
+
+// 0x2000A - 开始下注
+message MinesStartJettonNotify {
+  string roundId = 1;       // 回合ID
+  string gametype = 2; 		
+  int64 duration = 3;       // 下注持续时间（秒）
+}
+
+// 0x2000C - 停止下注
+message GameStopJettonNotify {
+  string roundId = 1;       // 游戏回合ID
+  string gameType = 2;      // 游戏类型
+  int64 stopTime = 3;       // 停止时间戳
+}
+
+// 0x2000E - 榜单-start jetton 和 stop jetton 阶段每秒推送一次
+message GameRankInfoNotify {
+  string roundId = 1;       // 游戏回合ID
+  string gameType = 2;      // 游戏类型
+  repeated PlayerInfoSnap players = 3; // 榜单信息
+}
+
+//from Gateway 0x10001
+message ConnClose {
+}

@@ -1,0 +1,42 @@
+{
+    "server": {
+        "port": 6600,
+        "http_port": 8080,
+        "game_type": ["mines_pro"],
+        "thread_pool_size": 4,
+        "max_queue_size_per_worker": 1000
+    },
+    "database": {
+        "mysql": {
+            "host": "127.0.0.1",
+            "port": 33060,
+            "user": "game",
+            "password": "123123",
+            "database": "game_db",
+            "max_connections": 10
+        },
+        "redis": {
+            "host": "127.0.0.1",
+            "port": 6379,
+            "password": "",
+            "db": 0,
+            "connection_timeout": 5,
+            "command_timeout": 10,
+            "pool_size": 5,
+            "keep_alive": true
+        },
+        "elasticsearch": {
+            "hosts": ["http://127.0.0.1:9200/"],
+            "connection_timeout": 5,
+            "request_timeout": 5,
+            "max_connections": 10
+        }
+    },
+    "consul": {
+        "url": "http://127.0.0.1:8500",
+        "token": "",
+        "service_name": "game_server",
+        "service_id": "game_server_1",
+        "service_check_interval": 2
+    }
+}
