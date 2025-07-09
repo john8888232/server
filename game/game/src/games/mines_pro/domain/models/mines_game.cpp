@@ -13,6 +13,7 @@
 #include "games/game_def.h"
 #include <core/infrastructure/common/error_code.h>
 #include <mutex>
+#include "games/mines_pro/infrastructure/repositories/mines_game_repository.h"
 
 using json = nlohmann::json;
 
@@ -328,10 +329,12 @@ void MinesGame::broadcastStatusNotify(GameStatus status) {
 
 void MinesGame::writeGameResultToDatabase() {
     try {
-        auto gameResults = getGameResults();
-        auto resultHash = generateResultHash();
+        // 创建repository实例
+        auto repository = std::make_shared<MinesGameRepositoryImpl>();
         
-        std::vector<std::string> playerData;
+        // 收集所有需要更新余额的玩家
+        std::vector<PlayerBalanceUpdate> balanceUpdates;
+        
         {
             std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
             for (const auto& playerPair : players_) {
@@ -339,14 +342,100 @@ void MinesGame::writeGameResultToDatabase() {
                 auto user = playerInGame->getUser();
                 if (!user) continue;
                 
+                const std::string& loginName = playerPair.first;
+                double currentBalance = user->getBalance();
+                
+                // 计算玩家的余额变化（包括下注和兑现）
+                double totalBetAmount = 0.0;
+                double totalWinAmount = 0.0;
+                
                 const auto& betRecords = playerInGame->getBetRecords();
                 for (const auto& bet : betRecords) {
-                    // TODO: 构造下注记录的JSON格式
+                    totalBetAmount += bet.getAmount();
+                }
+                
+                // 从榜单信息中获取兑现记录
+                {
+                    std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
+                    for (int i = 0; i < rankInfoNotify_.players_size(); ++i) {
+                        const auto& playerSnap = rankInfoNotify_.players(i);
+                        if (playerSnap.info().loginname() == loginName) {
+                            for (const auto& reckon : playerSnap.reckons()) {
+                                totalWinAmount += reckon.amount();
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                // 计算应该的余额变化
+                double balanceChange = totalWinAmount - totalBetAmount;
+                double expectedBalance = currentBalance + balanceChange;
+                
+                // 只有当余额发生变化时才更新
+                if (std::abs(balanceChange) > 0.001) {
+                    PlayerBalanceUpdate update;
+                    update.loginName = loginName;
+                    update.originalBalance = currentBalance;
+                    update.newBalance = expectedBalance;
+                    update.reason = "mines_game_result_" + roundID_;
+                    
+                    balanceUpdates.push_back(update);
+                    
+                    LOG_INFO("Prepared balance update for player %s: %.2f -> %.2f (bet: %.2f, win: %.2f)",
+                            loginName.c_str(), currentBalance, expectedBalance, totalBetAmount, totalWinAmount);
                 }
             }
         }
         
-        // TODO: 实际的数据库写入操作
+        // 如果没有需要更新的余额，直接返回
+        if (balanceUpdates.empty()) {
+            LOG_INFO("No balance updates needed for round %s", roundID_.c_str());
+            return;
+        }
+        
+        // 批量更新玩家余额
+        auto results = repository->updatePlayerBalancesBatch(balanceUpdates);
+        
+        // 处理更新结果
+        int successCount = 0;
+        int failureCount = 0;
+        
+        for (const auto& result : results) {
+            if (result.success) {
+                successCount++;
+                
+                // 更新游戏中玩家的余额
+                {
+                    std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+                    auto playerIt = players_.find(result.loginName);
+                    if (playerIt != players_.end()) {
+                        auto user = playerIt->second->getUser();
+                        if (user) {
+                            user->setBalance(result.actualBalance);
+                            LOG_INFO("Updated in-game balance for player %s to %.2f", 
+                                    result.loginName.c_str(), result.actualBalance);
+                        }
+                    }
+                }
+            } else {
+                failureCount++;
+                LOG_ERROR("Failed to update balance for player %s: %s", 
+                         result.loginName.c_str(), result.errorMessage.c_str());
+                
+                // 记录错误到日志文件或错误表
+                // TODO: 可以考虑写入专门的错误日志表
+            }
+        }
+        
+        LOG_INFO("Balance update completed for round %s: %d success, %d failures", 
+                roundID_.c_str(), successCount, failureCount);
+        
+        // 保存游戏状态到数据库
+        bool gameSaved = repository->saveGame(*this);
+        if (!gameSaved) {
+            LOG_ERROR("Failed to save game data to database for round %s", roundID_.c_str());
+        }
         
     } catch (const std::exception& e) {
         LOG_ERROR("Failed to write game result to database for round %s: %s", 

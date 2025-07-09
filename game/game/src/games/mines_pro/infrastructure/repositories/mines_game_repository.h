@@ -6,6 +6,24 @@
 #include <vector>
 #include "games/mines_pro/domain/models/mines_game.h"
 
+// 玩家余额更新请求结构
+struct PlayerBalanceUpdate {
+    std::string loginName;
+    double originalBalance;
+    double newBalance;
+    std::string reason;  // 更新原因，如"game_payout", "game_bet"等
+};
+
+// 玩家余额更新结果结构
+struct PlayerBalanceUpdateResult {
+    std::string loginName;
+    double originalBalance;
+    double newBalance;
+    double actualBalance;  // 实际数据库中的余额
+    bool success;
+    std::string errorMessage;
+};
+
 class MinesGameRepository {
 public:
     MinesGameRepository();
@@ -28,6 +46,16 @@ public:
     
     // 获取用户的游戏历史
     virtual std::vector<std::shared_ptr<MinesGame>> getUserGameHistory(int64_t userId, int limit = 10) = 0;
+    
+    // 更新玩家余额
+    virtual bool updatePlayerBalance(const std::string& loginName, double newBalance) = 0;
+    
+    // 获取玩家当前余额
+    virtual double getPlayerBalance(const std::string& loginName) = 0;
+    
+    // 批量更新玩家余额
+    virtual std::vector<PlayerBalanceUpdateResult> updatePlayerBalancesBatch(
+        const std::vector<PlayerBalanceUpdate>& updates) = 0;
 };
 
 // MySQL实现
@@ -42,6 +70,12 @@ public:
     bool deleteGame(const std::string& gameId) override;
     bool updateGameStatus(const std::string& gameId, GameStatus status) override;
     std::vector<std::shared_ptr<MinesGame>> getUserGameHistory(int64_t userId, int limit = 10) override;
+    
+    // 余额相关方法
+    bool updatePlayerBalance(const std::string& loginName, double newBalance) override;
+    double getPlayerBalance(const std::string& loginName) override;
+    std::vector<PlayerBalanceUpdateResult> updatePlayerBalancesBatch(
+        const std::vector<PlayerBalanceUpdate>& updates) override;
     
 private:
     // 序列化游戏状态为JSON
