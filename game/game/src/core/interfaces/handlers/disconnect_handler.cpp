@@ -50,9 +50,9 @@ void DisconnectHandler::immediateCleanupPlayerSession(const std::string& session
     if (gameManager && !loginname.empty()) {
         auto currentGame = gameManager->getPlayerGame(loginname);
         if (currentGame) {
-            // 断线时只标记为非活跃状态，不移除玩家数据
-            currentGame->setPlayerInactive(loginname);
-            LOG_INFO("Set player %s as inactive in game %s due to disconnect", 
+            // 处理断线时的兑现逻辑（封装在游戏类中）
+            currentGame->handlePlayerDisconnect(loginname);
+            LOG_INFO("Handled player disconnect for %s in game %s", 
                      loginname.c_str(), currentGame->roundID().c_str());
         } else {
             LOG_DEBUG("Player %s not found in any active game", loginname.c_str());

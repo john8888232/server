@@ -20,7 +20,7 @@ MinesGame::MinesGame()
     : minesCount_(3), totalTiles_(24), eventLoop_(nullptr), 
       tickCounter_(0), stateTransitionTarget_(-1), targetStatus_(GameStatus::INIT) {
     grid_ = std::make_shared<MinesGrid>();
-    status_ = GameStatus::INIT;
+    setStatus(GameStatus::INIT);  // 使用封装的方法
     gameType_ = "mines_pro";  // 设置游戏类型
     auto& appContext = AppContext::getInstance();
     eventLoop_ = appContext.getEventLoop();
@@ -48,22 +48,17 @@ void MinesGame::initializeMinesGrid() {
     }
     
     grid_->initialize(totalTiles_, minesCount_, tileConfig);
-    
-    LOG_DEBUG("Initialized MinesGrid: %d tiles with %d mines", 
-             totalTiles_, minesCount_);
 }
 
 bool MinesGame::inProgress() const {
-    return status_ == GameStatus::START_JETTON || 
-           status_ == GameStatus::STOP_JETTON ||
-           status_ == GameStatus::SETTLED;
+    return true;
 }
 
 void MinesGame::onAutoRevealTick() {
-    std::unique_lock<std::shared_mutex> lock(gameMutex_);  // 写锁，因为要修改游戏状态
+    std::unique_lock<std::shared_mutex> gridLock(gridMutex_);
     
-    if (status_ != GameStatus::STOP_JETTON) {
-        LOG_WARN("Auto reveal tick called in invalid status: %d", (int)status_);
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::STOP_JETTON) {
         return;
     }
     
@@ -77,31 +72,31 @@ void MinesGame::onAutoRevealTick() {
     }
     
     if (hasMine) {
-        // 踩到地雷，游戏结束
-        LOG_INFO("Game ended - mine hit! multiplier=%.2f", multiplier);
+        gridLock.unlock();
         enterSettledState();
     } else {
-        LOG_INFO("Auto reveal continues, current multiplier: %.2f", multiplier);
-        
-        // 释放锁后再调用checkAndProcessAutoCash，避免死锁
-        lock.unlock();
+        gridLock.unlock();
         checkAndProcessAutoCash();
     }
 }
 
 bool MinesGame::isTileRevealed(uint32_t index) const {
+    std::shared_lock<std::shared_mutex> lock(gridMutex_);
     return grid_->isTileRevealed(index);
 }
 
 int MinesGame::getRevealedTileCount() const {
+    std::shared_lock<std::shared_mutex> lock(gridMutex_);
     return grid_->getRevealedCount();
 }
 
 int MinesGame::getRevealedStarCount() const {
+    std::shared_lock<std::shared_mutex> lock(gridMutex_);
     return grid_->getRevealedStarCount();
 }
 
 double MinesGame::getCurrentMultiplier() const {
+    std::shared_lock<std::shared_mutex> lock(gridMutex_);
     int revealedStars = grid_->getRevealedStarCount();
     return getMultiplierForStarCount(revealedStars);
 }
@@ -114,16 +109,15 @@ double MinesGame::getMultiplierForStarCount(int starCount) const {
 }
 
 std::string MinesGame::generateResultHash() const {
+    std::shared_lock<std::shared_mutex> lock(gridMutex_);
     auto mineIndices = grid_->getMineIndices();
     
-    // 生成结果字符串：地雷=1，星星=0
     std::string resultString;
     for (uint32_t i = 1; i <= static_cast<uint32_t>(totalTiles_); ++i) {
         bool isMine = std::find(mineIndices.begin(), mineIndices.end(), i) != mineIndices.end();
         resultString += isMine ? '1' : '0';
     }
     
-    // 种子+结果生成哈希值
     std::string combined = seed_ + resultString;
     std::hash<std::string> hasher;
     size_t hashValue = hasher(combined);
@@ -134,29 +128,30 @@ std::string MinesGame::generateResultHash() const {
 }
 
 void MinesGame::generateGameGrid() {
-    // 使用时间戳作为随机种子
-        auto now = std::chrono::system_clock::now();
-        auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-        seed_ = std::to_string(timestamp);
+    auto now = std::chrono::system_clock::now();
+    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    seed_ = std::to_string(timestamp);
     
+    std::unique_lock<std::shared_mutex> lock(gridMutex_);
     grid_->generateGrid(seed_);
 }
 
 std::vector<proto::GameResult> MinesGame::getGameResults() const {
     std::vector<proto::GameResult> results;
     
+    std::shared_lock<std::shared_mutex> lock(gridMutex_);
     const auto& tiles = grid_->getAllTiles();
     for (const auto& tile : tiles) {
         proto::GameResult result;
         result.set_index(tile.index);
         result.set_multi(tile.multiplier);
         
-        // 协议字段：1=未翻开，2=星星，3=地雷
         int32_t resultType = 1;
         
-        if (status_ == GameStatus::START_JETTON) {
-            resultType = 1;  // 下注阶段全部显示未翻开
-        } else if (status_ == GameStatus::STOP_JETTON || status_ == GameStatus::SETTLED) {
+        GameStatus currentStatus = getStatus();
+        if (currentStatus == GameStatus::START_JETTON) {
+            resultType = 1;
+        } else if (currentStatus == GameStatus::STOP_JETTON || currentStatus == GameStatus::SETTLED) {
             if (tile.status == TileStatus::REVEALED) {
                 resultType = (tile.type == TileType::STAR) ? 2 : 3;
             } else {
@@ -172,13 +167,15 @@ std::vector<proto::GameResult> MinesGame::getGameResults() const {
 }
 
 bool MinesGame::start() {
-    if (status_ != GameStatus::INIT) {
-        LOG_ERROR("Cannot start game, invalid status: %d", (int)status_);
+    GameStatus expected = GameStatus::INIT;
+    if (!compareAndSwapStatus(expected, GameStatus::START_JETTON)) {
+        LOG_ERROR("Cannot start game, invalid status: %d", (int)expected);
         return false;
     }
     
     if (!eventLoop_) {
         LOG_ERROR("EventLoop not available for game");
+        setStatus(GameStatus::INIT);
         return false;
     }
     
@@ -187,83 +184,67 @@ bool MinesGame::start() {
     startTime_ = std::chrono::system_clock::now();
     initializeRankInfo();
     
-    status_ = GameStatus::START_JETTON;
     broadcastStatusNotify(GameStatus::START_JETTON);
     
-    // 启动统一定时器，设置下注时间
     tickCounter_ = 0;
     createUnifiedTimer();
     setStateTransition(bettingTime_, GameStatus::STOP_JETTON);
     
-    LOG_INFO("Game started with roundId: %s", roundID_.c_str());
     return true;
 }
 
 void MinesGame::stop() {
     LOG_INFO("Stopping game: %s", roundID_.c_str());
     cleanupUnifiedTimer();
-    status_ = GameStatus::INIT;
+    setStatus(GameStatus::INIT);
 }
 
 void MinesGame::onStartJettonComplete() {
-    LOG_INFO("START_JETTON phase completed for game %s", roundID_.c_str());
-    
-    status_ = GameStatus::STOP_JETTON;
-    broadcastStatusNotify(GameStatus::STOP_JETTON);
+    GameStatus expected = GameStatus::START_JETTON;
+    if (compareAndSwapStatus(expected, GameStatus::STOP_JETTON)) {
+        broadcastStatusNotify(GameStatus::STOP_JETTON);
+    } else {
+        LOG_WARN("Failed to transition from START_JETTON to STOP_JETTON, current status: %d", 
+                 (int)getStatus());
+    }
 }
 
 void MinesGame::onSettledComplete() {
-    LOG_INFO("SETTLED phase completed for game %s", roundID_.c_str());
-    
     startNewRound();
 }
 
 void MinesGame::enterSettledState() {
-    LOG_INFO("Entering SETTLED state for game %s", roundID_.c_str());
-    
-    status_ = GameStatus::SETTLED;
-    writeGameResultToDatabase();
-    
-    // 3秒后开始新一轮
-    setStateTransition(WAIT_DURATION, GameStatus::START_JETTON);
+    GameStatus expected = GameStatus::STOP_JETTON;
+    if (compareAndSwapStatus(expected, GameStatus::SETTLED)) {
+        writeGameResultToDatabase();
+        cleanupInactivePlayers();
+        setStateTransition(WAIT_DURATION, GameStatus::START_JETTON);
+    } else {
+        LOG_WARN("Failed to transition to SETTLED state, current status: %d", 
+                 (int)getStatus());
+    }
 }
 
 void MinesGame::startNewRound() {
-    LOG_INFO("Starting new round for game %s", roundID_.c_str());
-    
-    // 使用基类的静态方法生成新的roundID
     roundID_ = IGame::generateRoundId(gameType_);
-    
-    // 重置网格
     generateGameGrid();
-    
-    // 初始化榜单信息（会自动设置新的roundId和gameType）
     initializeRankInfo();
     
-    // 重置所有玩家的兑现状态
-    resetAllPlayersCashOutStatus();
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        resetAllPlayersCashOutStatus();
+    }
     
-    // 设置新的开始时间
     startTime_ = std::chrono::system_clock::now();
-    
-    // 状态转换到START_JETTON
-    status_ = GameStatus::START_JETTON;
-    
-    // 广播开始下注通知
+    setStatus(GameStatus::START_JETTON);
     broadcastStatusNotify(GameStatus::START_JETTON);
     
-    // 重置计数器并创建统一定时器
     tickCounter_ = 0;
     createUnifiedTimer();
-    
-    // 设置状态转换：bettingTime_秒后转换到STOP_JETTON
     setStateTransition(bettingTime_, GameStatus::STOP_JETTON);
 }
 
 void MinesGame::broadcastStatusNotify(GameStatus status) {
-    LOG_INFO("Broadcasting status change for game %s: %d", 
-             roundID_.c_str(), (int)status);
-    
     auto& appContext = AppContext::getInstance();
     auto tcpServer = appContext.getTcpServer();
     if (!tcpServer) {
@@ -274,10 +255,8 @@ void MinesGame::broadcastStatusNotify(GameStatus status) {
     uint32_t protocolId = 0;
     std::string messageData;
     
-    // 根据游戏状态创建相应的通知消息
     switch (status) {
         case GameStatus::START_JETTON: {
-            // 创建开始下注通知
             proto::MinesStartJettonNotify notify;
             notify.set_roundid(roundID_);
             notify.set_gametype(gameType_);
@@ -310,8 +289,6 @@ void MinesGame::broadcastStatusNotify(GameStatus status) {
         }
         
         case GameStatus::SETTLED: {
-            // SETTLED状态不需要特别的广播消息，可以使用游戏快照
-            LOG_INFO("SETTLED state entered, no specific broadcast needed");
             return;
         }
         
@@ -326,78 +303,50 @@ void MinesGame::broadcastStatusNotify(GameStatus status) {
         return;
     }
     
-    // 广播给所有活跃玩家
     int broadcastCount = 0;
-    for (const auto& playerPair : players_) {
-        const auto& playerInGame = playerPair.second;
-        
-        // 只向活跃玩家广播
-        if (!playerInGame->isActive()) {
-            continue;
-        }
-        
-        // 获取玩家会话
-        auto session = playerInGame->getSession().lock();
-        if (!session) {
-            LOG_WARN("Player %s session is not available", playerPair.first.c_str());
-            continue;
-        }
-        
-        // 发送消息给玩家
-        bool success = tcpServer->sendToPlayer(session->getSessionId(), protocolId, messageData);
-        if (success) {
-            broadcastCount++;
-            LOG_DEBUG("Sent status notify to player %s (session: %s)", 
-                     playerPair.first.c_str(), session->getSessionId().c_str());
-        } else {
-            LOG_WARN("Failed to send status notify to player %s", playerPair.first.c_str());
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        for (const auto& playerPair : players_) {
+            const auto& playerInGame = playerPair.second;
+            
+            if (!playerInGame->isActive()) {
+                continue;
+            }
+            
+            auto session = playerInGame->getSession().lock();
+            if (!session) {
+                continue;
+            }
+            
+            bool success = tcpServer->sendToPlayer(session->getSessionId(), protocolId, messageData);
+            if (success) {
+                broadcastCount++;
+            }
         }
     }
-    
-    LOG_INFO("Broadcasted status %d for game %s to %d active players", 
-             (int)status, roundID_.c_str(), broadcastCount);
 }
 
 void MinesGame::writeGameResultToDatabase() {
-    LOG_INFO("Writing game result to database for round: %s", roundID_.c_str());
-    
     try {
-        // TODO: 实现数据库写入逻辑
-        // 这里应该写入 mines_pro_result 表
-        // 包含游戏结果、玩家下注、派奖等信息
-        
-        // 获取游戏结果
         auto gameResults = getGameResults();
         auto resultHash = generateResultHash();
         
-        // 获取所有玩家的下注和派奖信息
         std::vector<std::string> playerData;
-        for (const auto& playerPair : players_) {
-            const auto& playerInGame = playerPair.second;
-            auto user = playerInGame->getUser();
-            if (!user) continue;
-            
-            // 收集玩家的下注记录
-            const auto& betRecords = playerInGame->getBetRecords();
-            for (const auto& bet : betRecords) {
-                // 构造下注记录的JSON或其他格式
-                // 这里需要根据实际的数据库表结构来决定
-                LOG_DEBUG("Player %s bet: type=%s, amount=%.2f", 
-                         user->getLoginName().c_str(), 
-                         bet.getPlayType().c_str(), 
-                         bet.getAmount());
+        {
+            std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+            for (const auto& playerPair : players_) {
+                const auto& playerInGame = playerPair.second;
+                auto user = playerInGame->getUser();
+                if (!user) continue;
+                
+                const auto& betRecords = playerInGame->getBetRecords();
+                for (const auto& bet : betRecords) {
+                    // TODO: 构造下注记录的JSON格式
+                }
             }
         }
         
-        // 实际的数据库写入操作
-        // 这里需要使用数据库连接池或者数据库服务来执行SQL
-        // INSERT INTO mines_pro_result (round_id, game_type, result_hash, game_data, created_at) 
-        // VALUES (?, ?, ?, ?, NOW())
-        
-        LOG_INFO("Successfully wrote game result to database for round: %s", roundID_.c_str());
-        
-        // 数据库写入完成后，清理inactive玩家
-        cleanupInactivePlayers();
+        // TODO: 实际的数据库写入操作
         
     } catch (const std::exception& e) {
         LOG_ERROR("Failed to write game result to database for round %s: %s", 
@@ -440,29 +389,28 @@ void MinesGame::initializeWithConfig(const json& config) {
                     double weight = multipliers[key][1].get<double>();
                     tileConfigs_.push_back({multiplier, weight});
                 } else {
-                    LOG_WARN("Missing or incomplete config for tile %d, using default values", i);
-                    tileConfigs_.push_back({1.0, 1.0}); // 默认倍数1.0，权重1.0
+                    tileConfigs_.push_back({1.0, 1.0});
                 }
             }
             if (tileConfigs_.size() != totalTiles) {
                 LOG_WARN("Tile configs incomplete, using default values");
                 // 使用默认值
                 tileConfigs_ = {
-                    {1.14, 1491}, {1.31, 2595}, {1.52, 3618}, {1.77, 4520}, {2.08, 5337},
-                    {2.48, 6089}, {2.97, 6734}, {3.61, 7313}, {4.44, 7815}, {5.56, 8255},
-                    {7.07, 8628}, {9.2, 8946}, {12.26, 9209}, {16.86, 9425}, {24.09, 9597},
-                    {36.14, 9732}, {57.82, 9832}, {101.2, 9904}, {202.4, 9952}, {506.0, 9981},
-                    {2024.0, 5000}, {0, 5000}, {0, 5000}, {0, 5000}
+                    {1.14, 18149}, {1.31, 17554}, {1.52, 16959}, {1.77, 16364}, {2.08, 15769},
+                    {2.48, 15174}, {2.97, 14579}, {3.61, 13985}, {4.44, 13390}, {5.56, 12795},
+                    {7.07, 12200}, {9.2, 11605}, {12.26, 11010}, {16.86, 10415}, {24.09, 9820},
+                    {36.14, 9225}, {57.82, 8631}, {101.2, 8036}, {202.4, 7441}, {506.0, 6846},
+                    {2024.0, 6251}, {0, 1000}, {0, 1000}, {0, 1000}
                 };
             }
         } else {
             // 使用默认值
             tileConfigs_ = {
-                {1.14, 1491}, {1.31, 2595}, {1.52, 3618}, {1.77, 4520}, {2.08, 5337},
-                {2.48, 6089}, {2.97, 6734}, {3.61, 7313}, {4.44, 7815}, {5.56, 8255},
-                {7.07, 8628}, {9.2, 8946}, {12.26, 9209}, {16.86, 9425}, {24.09, 9597},
-                {36.14, 9732}, {57.82, 9832}, {101.2, 9904}, {202.4, 9952}, {506.0, 9981},
-                {2024.0, 5000}, {0, 5000}, {0, 5000}, {0, 5000}
+                {1.14, 18149}, {1.31, 17554}, {1.52, 16959}, {1.77, 16364}, {2.08, 15769},
+                {2.48, 15174}, {2.97, 14579}, {3.61, 13985}, {4.44, 13390}, {5.56, 12795},
+                {7.07, 12200}, {9.2, 11605}, {12.26, 11010}, {16.86, 10415}, {24.09, 9820},
+                {36.14, 9225}, {57.82, 8631}, {101.2, 8036}, {202.4, 7441}, {506.0, 6846},
+                {2024.0, 6251}, {0, 1000}, {0, 1000}, {0, 1000}
             };
         }
         
@@ -470,11 +418,11 @@ void MinesGame::initializeWithConfig(const json& config) {
         LOG_ERROR("Error parsing game config: %s", e.what());
         // 使用默认值
         tileConfigs_ = {
-            {1.14, 1491}, {1.31, 2595}, {1.52, 3618}, {1.77, 4520}, {2.08, 5337},
-            {2.48, 6089}, {2.97, 6734}, {3.61, 7313}, {4.44, 7815}, {5.56, 8255},
-            {7.07, 8628}, {9.2, 8946}, {12.26, 9209}, {16.86, 9425}, {24.09, 9597},
-            {36.14, 9732}, {57.82, 9832}, {101.2, 9904}, {202.4, 9952}, {506.0, 9981},
-            {2024.0, 5000}, {0, 5000}, {0, 5000}, {0, 5000}
+            {1.14, 18149}, {1.31, 17554}, {1.52, 16959}, {1.77, 16364}, {2.08, 15769},
+            {2.48, 15174}, {2.97, 14579}, {3.61, 13985}, {4.44, 13390}, {5.56, 12795},
+            {7.07, 12200}, {9.2, 11605}, {12.26, 11010}, {16.86, 10415}, {24.09, 9820},
+            {36.14, 9225}, {57.82, 8631}, {101.2, 8036}, {202.4, 7441}, {506.0, 6846},
+            {2024.0, 6251}, {0, 1000}, {0, 1000}, {0, 1000}
         };
     }
 
@@ -494,25 +442,27 @@ std::shared_ptr<proto::GameSnapshotNotify> MinesGame::createSnapshot() {
     // 创建游戏快照
     auto snapshot = std::make_shared<proto::GameSnapshotNotify>();
     
-    // 线程安全：在锁保护下读取游戏状态
-    std::shared_lock<std::shared_mutex> lock(gameMutex_);
+    // 读操作：gameStateMutex_(读) + gridMutex_(读) - 按锁顺序获取
+    std::shared_lock<std::shared_mutex> gameStateLock(gameStateMutex_);
+    std::shared_lock<std::shared_mutex> gridLock(gridMutex_);
     
+    GameStatus currentStatus = getStatus();
     snapshot->set_roundid(roundID_);
     snapshot->set_gametype(gameType_);
-    snapshot->set_status(static_cast<int32_t>(status_));
+    snapshot->set_status(static_cast<int32_t>(currentStatus));
     
     // 计算剩余时间（只有下注阶段有意义）
     int64_t remainTime = 0;
-    if (status_ == GameStatus::START_JETTON) {
-    auto now = std::chrono::system_clock::now();
-    auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(now - startTime_).count();
-            remainTime = std::max(0, static_cast<int>(bettingTime_) - static_cast<int>(elapsedSeconds));
+    if (currentStatus == GameStatus::START_JETTON) {
+        auto now = std::chrono::system_clock::now();
+        auto elapsedSeconds = std::chrono::duration_cast<std::chrono::seconds>(now - startTime_).count();
+        remainTime = std::max(0, static_cast<int>(bettingTime_) - static_cast<int>(elapsedSeconds));
     }
     
     snapshot->set_remaintime(remainTime);
     
     // 设置当前游戏数据
-    if (status_ == GameStatus::STOP_JETTON || status_ == GameStatus::SETTLED) {
+    if (currentStatus == GameStatus::STOP_JETTON || currentStatus == GameStatus::SETTLED) {
         snapshot->set_curindex(getRevealedStarCount());
         snapshot->set_curmulti(getCurrentMultiplier());
     } else {
@@ -522,7 +472,7 @@ std::shared_ptr<proto::GameSnapshotNotify> MinesGame::createSnapshot() {
     }
     
     // 添加游戏结果 - 根据协议，状态1、2、3时有效
-    if (status_ == GameStatus::START_JETTON || status_ == GameStatus::STOP_JETTON || status_ == GameStatus::SETTLED) {
+    if (currentStatus == GameStatus::START_JETTON || currentStatus == GameStatus::STOP_JETTON || currentStatus == GameStatus::SETTLED) {
         auto gameResults = getGameResults();
         for (const auto& result : gameResults) {
             auto protoResult = snapshot->add_result();
@@ -530,9 +480,8 @@ std::shared_ptr<proto::GameSnapshotNotify> MinesGame::createSnapshot() {
         }
     }
     
-    
     LOG_INFO("Created snapshot for game %s: status=%d, remainTime=%ld, results=%d", 
-             roundID_.c_str(), static_cast<int>(status_), remainTime, 
+             roundID_.c_str(), static_cast<int>(currentStatus), remainTime, 
              snapshot->result_size());
     
     return snapshot;
@@ -618,7 +567,7 @@ void MinesGame::initializeRankInfo() {
 
 void MinesGame::updatePlayerBet(const std::string& loginname, const proto::PlayerInfo& playerInfo, 
                                const proto::BetRecord& betRecord) {
-    // 注意：此方法应在gameMutex_锁保护下调用
+    // 注意：此方法应在rankMutex_锁保护下调用
     
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(betRecord.playtype());
@@ -656,7 +605,7 @@ void MinesGame::updatePlayerBet(const std::string& loginname, const proto::Playe
 }
 
 void MinesGame::updatePlayerCash(const std::string& loginname, const proto::ReckonRecord& reckonRecord) {
-    // 注意：此方法应在gameMutex_锁保护下调用
+    // 注意：此方法应在rankMutex_锁保护下调用
     
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(reckonRecord.playtype());
@@ -679,7 +628,7 @@ void MinesGame::updatePlayerCash(const std::string& loginname, const proto::Reck
 }
 
 void MinesGame::sortRankByBetAmount() {
-    // 注意：此方法应在gameMutex_锁保护下调用
+    // 注意：此方法应在rankMutex_锁保护下调用
     
     // 创建索引和下注金额的映射
     std::vector<std::pair<double, int>> betAmountIndex;
@@ -742,20 +691,51 @@ void MinesGame::clearRankInfo() {
 }
 
 proto::GameRankInfoNotify MinesGame::getRankInfoNotify() const {
-    std::shared_lock<std::shared_mutex> lock(gameMutex_);
-    return rankInfoNotify_;  // 返回副本，线程安全
+    std::shared_lock<std::shared_mutex> lock(rankMutex_);
+    
+    // 创建限制为前50个的副本
+    proto::GameRankInfoNotify rankInfoCopy;
+    rankInfoCopy.set_roundid(rankInfoNotify_.roundid());
+    rankInfoCopy.set_gametype(rankInfoNotify_.gametype());
+    
+    // 限制玩家数量为前50个
+    int playerCount = rankInfoNotify_.players_size();
+    int maxPlayers = std::min(playerCount, MAX_RANK_DISPLAY_COUNT);
+    
+    for (int i = 0; i < maxPlayers; ++i) {
+        auto* newPlayer = rankInfoCopy.add_players();
+        *newPlayer = rankInfoNotify_.players(i);
+    }
+    
+    return rankInfoCopy;  // 返回限制后的副本，线程安全
 }
 
 void MinesGame::broadcastRankInfo() {
-    if (status_ != GameStatus::START_JETTON && status_ != GameStatus::STOP_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::START_JETTON && currentStatus != GameStatus::STOP_JETTON) {
         return;
     }
     
-    // 线程安全：获取榜单数据的快照
+    // 线程安全：获取榜单数据的快照并限制为前50个
     proto::GameRankInfoNotify rankInfoCopy;
     {
-        std::shared_lock<std::shared_mutex> lock(gameMutex_);
-        rankInfoCopy = rankInfoNotify_;  // 复制当前榜单数据
+        std::shared_lock<std::shared_mutex> lock(rankMutex_);
+        
+        // 复制基本信息
+        rankInfoCopy.set_roundid(rankInfoNotify_.roundid());
+        rankInfoCopy.set_gametype(rankInfoNotify_.gametype());
+        
+        // 限制玩家数量为前50个
+        int playerCount = rankInfoNotify_.players_size();
+        int maxPlayers = std::min(playerCount, MAX_RANK_DISPLAY_COUNT);
+        
+        for (int i = 0; i < maxPlayers; ++i) {
+            auto* newPlayer = rankInfoCopy.add_players();
+            *newPlayer = rankInfoNotify_.players(i);
+        }
+        
+        LOG_DEBUG("Prepared rank info for broadcast: %d/%d players (limited to %d)", 
+                  maxPlayers, playerCount, MAX_RANK_DISPLAY_COUNT);
     }
     
     std::string data;
@@ -775,7 +755,7 @@ void MinesGame::broadcastRankInfo() {
     // 线程安全：获取玩家列表的快照
     std::unordered_map<std::string, std::shared_ptr<PlayerInGame>> playersCopy;
     {
-        std::shared_lock<std::shared_mutex> lock(gameMutex_);
+        std::shared_lock<std::shared_mutex> lock(playersMutex_);
         playersCopy = players_;  // 复制玩家列表
     }
     
@@ -811,7 +791,8 @@ void MinesGame::broadcastRankInfo() {
 }
 
 void MinesGame::broadcastSnapshot() {
-    if (status_ != GameStatus::STOP_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::STOP_JETTON) {
         return;
     }
     
@@ -840,7 +821,7 @@ void MinesGame::broadcastSnapshot() {
     // 线程安全：获取玩家列表的快照
     std::unordered_map<std::string, std::shared_ptr<PlayerInGame>> playersCopy;
     {
-        std::shared_lock<std::shared_mutex> lock(gameMutex_);
+        std::shared_lock<std::shared_mutex> lock(playersMutex_);
         playersCopy = players_;  // 复制玩家列表
     }
     
@@ -923,7 +904,8 @@ void MinesGame::onUnifiedTick() {
     checkStateTransition();
     
     // 处理自动翻牌（STOP_JETTON阶段）- 先翻牌
-    if (status_ == GameStatus::STOP_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus == GameStatus::STOP_JETTON) {
         handleAutoReveal();
     }
     
@@ -938,7 +920,7 @@ void MinesGame::onUnifiedTick() {
 void MinesGame::checkStateTransition() {
     if (stateTransitionTarget_ > 0 && tickCounter_ >= stateTransitionTarget_) {
         LOG_INFO("State transition triggered for game %s: %d -> %d", 
-                 roundID_.c_str(), (int)status_, (int)targetStatus_);
+                 roundID_.c_str(), (int)getStatus(), (int)targetStatus_);
         
         // 重置状态转换
         stateTransitionTarget_ = -1;
@@ -960,12 +942,13 @@ void MinesGame::checkStateTransition() {
 
 void MinesGame::handleBroadcasts() {
     // 在 START_JETTON 和 STOP_JETTON 阶段广播榜单
-    if (status_ == GameStatus::START_JETTON || status_ == GameStatus::STOP_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus == GameStatus::START_JETTON || currentStatus == GameStatus::STOP_JETTON) {
         broadcastRankInfo();
     }
     
     // 在 STOP_JETTON 阶段广播快照
-    if (status_ == GameStatus::STOP_JETTON) {
+    if (currentStatus == GameStatus::STOP_JETTON) {
         broadcastSnapshot();
     }
 }
@@ -981,15 +964,18 @@ void MinesGame::setStateTransition(int seconds, GameStatus targetStatus) {
              roundID_.c_str(), seconds, (int)targetStatus);
 }
 
-bool MinesGame::processCashOut(const std::string& loginname, const std::string& requestRoundId, 
+bool MinesGame::processCashOut(const std::string& loginname, const std::string& requestRoundId,
                                int32_t playType, proto::MinesCashRes& response) {
-    std::unique_lock<std::shared_mutex> lock(gameMutex_);  // 写锁，因为要修改玩家余额和榜单
+    // 写操作：playersMutex_(写) + rankMutex_(写) - 按锁顺序获取
+    std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
     
     response.set_roundid(roundID_);
     response.set_playtype(playType);
     response.set_balance(0.0);
     
-    if (status_ != GameStatus::STOP_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::STOP_JETTON) {
         response.set_code(ErrorCode::CASH_NOT_ALLOWED);
         response.set_message("Cash out only allowed during STOP_JETTON phase");
         return false;
@@ -1008,9 +994,8 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
     }
     
     // 通过loginname查找玩家信息
-    const auto& players = getPlayers();
-    auto playerIt = players.find(loginname);
-    if (playerIt == players.end()) {
+    auto playerIt = players_.find(loginname);
+    if (playerIt == players_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player not found in game");
         return false;
@@ -1071,9 +1056,15 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
         return false;
     }
     
-    // 计算兑现金额
-    double currentMultiplier = getCurrentMultiplier();
-    bool hasMine = grid_->hasRevealedMine();
+    // 计算兑现金额 - 需要临时获取gridMutex_读锁
+    double currentMultiplier;
+    bool hasMine;
+    {
+        std::shared_lock<std::shared_mutex> gridLock(gridMutex_);
+        int revealedStars = grid_->getRevealedStarCount();
+        currentMultiplier = getMultiplierForStarCount(revealedStars);
+        hasMine = grid_->hasRevealedMine();
+    }
     
     if (hasMine) {
         currentMultiplier = 0.0;
@@ -1119,7 +1110,9 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
 
 bool MinesGame::processCancelBet(const std::string& loginname, const std::string& requestRoundId, 
                                 int32_t playType, proto::MinesCancelBetRes& response) {
-    std::unique_lock<std::shared_mutex> lock(gameMutex_);  // 写锁，因为要修改玩家余额和榜单
+    // 写操作：playersMutex_(写) + rankMutex_(写) - 按锁顺序获取
+    std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
     
     // 设置基本响应信息
     response.set_roundid(roundID_);
@@ -1127,7 +1120,8 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
     response.set_refundamount(0.0);
     response.set_balance(0.0);
     
-    if (status_ != GameStatus::START_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::START_JETTON) {
         response.set_code(ErrorCode::BET_NOT_ALLOWED);
         response.set_message("Cancel bet only allowed during START_JETTON phase");
         return false;
@@ -1145,9 +1139,8 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
         return false;
     }
     
-    const auto& players = getPlayers();
-    auto playerIt = players.find(loginname);
-    if (playerIt == players.end()) {
+    auto playerIt = players_.find(loginname);
+    if (playerIt == players_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player not found in game");
         return false;
@@ -1228,14 +1221,17 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
 
 bool MinesGame::processPlaceBet(const std::string& loginname, const std::string& requestRoundId,
                                int32_t playType, double amount, proto::MinesPlaceBetRes& response) {
-    std::unique_lock<std::shared_mutex> lock(gameMutex_);  // 写锁，因为要修改玩家余额和榜单
+    // 写操作：playersMutex_(写) + rankMutex_(写) - 按锁顺序获取
+    std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
     
     // 设置基本响应信息
     response.set_roundid(roundID_);
     response.set_balance(0.0);
     
     // 1. 游戏状态检查
-    if (status_ != GameStatus::START_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::START_JETTON) {
         response.set_code(ErrorCode::BET_NOT_ALLOWED);
         response.set_message("Bet not allowed in current game status");
         return false;
@@ -1263,18 +1259,8 @@ bool MinesGame::processPlaceBet(const std::string& loginname, const std::string&
     }
     
     // 5. 通过loginname查找玩家信息
-    auto& appContext = AppContext::getInstance();
-    auto gameManager = appContext.getGameManager();
-    if (!gameManager) {
-        response.set_code(ErrorCode::GAME_SERVER_ERROR);
-        response.set_message("Game server error");
-        return false;
-    }
-    
-    // 从游戏中查找玩家
-    const auto& players = getPlayers();
-    auto playerIt = players.find(loginname);
-    if (playerIt == players.end()) {
+    auto playerIt = players_.find(loginname);
+    if (playerIt == players_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player not found in game");
         return false;
@@ -1347,12 +1333,15 @@ void MinesGame::cleanupInactivePlayers() {
     
     std::vector<std::string> inactivePlayerNames;
     
-    // 收集所有inactive玩家
-    for (const auto& playerPair : players_) {
-        const auto& playerInGame = playerPair.second;
-        if (!playerInGame->isActive()) {
-            inactivePlayerNames.push_back(playerPair.first);
-            LOG_INFO("Found inactive player: %s", playerPair.first.c_str());
+    // 收集所有inactive玩家 - 需要锁保护
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        for (const auto& playerPair : players_) {
+            const auto& playerInGame = playerPair.second;
+            if (!playerInGame->isActive()) {
+                inactivePlayerNames.push_back(playerPair.first);
+                LOG_INFO("Found inactive player: %s", playerPair.first.c_str());
+            }
         }
     }
     
@@ -1361,7 +1350,7 @@ void MinesGame::cleanupInactivePlayers() {
         return;
     }
     
-    // 清理每个inactive玩家
+    // 逐个清理inactive玩家
     for (const std::string& loginname : inactivePlayerNames) {
         try {
             LOG_INFO("Cleaning up inactive player: %s", loginname.c_str());
@@ -1375,9 +1364,15 @@ void MinesGame::cleanupInactivePlayers() {
                 LOG_WARN("Failed to clear Redis online info for inactive player: %s", loginname.c_str());
             }
             
-            // 2. 从游戏中移除玩家
-            removePlayer(loginname);
-            LOG_INFO("Removed inactive player %s from game %s", loginname.c_str(), roundID_.c_str());
+            // 2. 从players_容器中移除玩家（需要写锁保护）
+            {
+                std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
+                auto it = players_.find(loginname);
+                if (it != players_.end()) {
+                    LOG_INFO("Removing player %s from game", loginname.c_str());
+                    players_.erase(it);
+                }
+            }
             
             // 3. 从GameManager中移除玩家映射
             auto& appContext = AppContext::getInstance();
@@ -1397,8 +1392,6 @@ void MinesGame::cleanupInactivePlayers() {
 }
 
 void MinesGame::rebuildPlayerPlayTypeToRankMapping() {
-    // 此方法应在gameMutex_锁保护下调用
-    // 重建playerPlayTypeToRankIndex映射
     playerPlayTypeToRankIndex_.clear();
     
     // 遍历榜单中的每个条目，重建(玩家,玩法)到索引的映射
@@ -1419,7 +1412,7 @@ void MinesGame::rebuildPlayerPlayTypeToRankMapping() {
 }
 
 void MinesGame::updatePlayerCancelBet(const std::string& loginname, int32_t playType, double refundAmount) {
-    // 此方法应在gameMutex_锁保护下调用
+    // 此方法应在rankMutex_锁保护下调用
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
     auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
@@ -1450,7 +1443,8 @@ void MinesGame::updatePlayerCancelBet(const std::string& loginname, int32_t play
 // 自动兑现相关方法实现
 bool MinesGame::processAutoCash(const std::string& loginname, const std::string& requestRoundId,
                                int32_t playType, bool enable, int32_t targetGrid, proto::MinesAutoCashRes& response) {
-    std::unique_lock<std::shared_mutex> lock(gameMutex_);  // 写锁，因为要修改玩家配置
+    // 写操作：playersMutex_(写) - 只需要修改玩家配置
+    std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
     
     // 设置基本响应信息
     response.set_roundid(roundID_);
@@ -1472,9 +1466,8 @@ bool MinesGame::processAutoCash(const std::string& loginname, const std::string&
     }
     
     // 3. 查找玩家
-    const auto& players = getPlayers();
-    auto playerIt = players.find(loginname);
-    if (playerIt == players.end()) {
+    auto playerIt = players_.find(loginname);
+    if (playerIt == players_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player not found in game");
         return false;
@@ -1531,21 +1524,28 @@ bool MinesGame::processAutoCash(const std::string& loginname, const std::string&
 }
 
 void MinesGame::checkAndProcessAutoCash() {
-    // 获取写锁，因为要修改玩家状态和榜单
-    std::unique_lock<std::shared_mutex> lock(gameMutex_);
+    // 写操作：playersMutex_(写) + rankMutex_(写) - 按锁顺序获取
+    std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
     
     // 只在STOP_JETTON阶段检查自动兑现
-    if (status_ != GameStatus::STOP_JETTON) {
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::STOP_JETTON) {
         return;
     }
     
-    int currentRevealedCount = getRevealedStarCount();
+    // 获取当前已翻开的星星数量
+    int currentRevealedCount;
+    {
+        std::shared_lock<std::shared_mutex> gridLock(gridMutex_);
+        currentRevealedCount = grid_->getRevealedStarCount();
+    }
     
     for (const auto& playerPair : players_) {
         const std::string& loginname = playerPair.first;
         const auto& playerInGame = playerPair.second;
         
-        if (!playerInGame || !playerInGame->isActive()) {
+        if (!playerInGame) {
             continue;
         }
         
@@ -1553,10 +1553,15 @@ void MinesGame::checkAndProcessAutoCash() {
         for (int32_t playType = 1; playType <= 2; ++playType) {
             // 检查是否启用自动兑现
             if (!playerInGame->getAutoCashEnabled(playType)) {
+                // 对于未开启auto cash的玩家，只处理活跃玩家
+                if (!playerInGame->isActive()) {
+                    continue;
+                }
+                // 未开启auto cash的逻辑保持不变
                 continue;
             }
             
-            // 检查是否已经兑现过
+            // 对于开启了auto cash的玩家，无论是否活跃都要检查
             if (playerInGame->hasCashedOut(playType)) {
                 continue;
             }
@@ -1565,8 +1570,9 @@ void MinesGame::checkAndProcessAutoCash() {
             int32_t targetGrid = playerInGame->getAutoCashTargetGrid(playType);
             if (currentRevealedCount >= targetGrid) {
                 // 执行自动兑现
-                LOG_INFO("Auto cash triggered for player %s: playType=%d, currentGrid=%d, targetGrid=%d", 
-                         loginname.c_str(), playType, currentRevealedCount, targetGrid);
+                LOG_INFO("Auto cash triggered for player %s (active=%s): playType=%d, currentGrid=%d, targetGrid=%d", 
+                         loginname.c_str(), playerInGame->isActive() ? "true" : "false", 
+                         playType, currentRevealedCount, targetGrid);
                 
                 // 直接执行兑现逻辑，避免死锁
                 bool success = executeCashOutInternal(loginname, playType);
@@ -1575,24 +1581,29 @@ void MinesGame::checkAndProcessAutoCash() {
                     // 标记为已兑现
                     playerInGame->setCashedOut(playType, true);
                     
-                    // 发送兑现响应给玩家
-                    auto session = playerInGame->getSession().lock();
-                    if (session) {
-                        auto& appContext = AppContext::getInstance();
-                        auto tcpServer = appContext.getTcpServer();
-                        if (tcpServer) {
-                            // 创建兑现响应
-                            proto::MinesCashRes cashResponse;
-                            cashResponse.set_roundid(roundID_);
-                            cashResponse.set_code(0);
-                            cashResponse.set_message("Auto cash successful");
-                            cashResponse.set_playtype(playType);
-                            
-                            std::string data;
-                            cashResponse.SerializeToString(&data);
-                            tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_MINES_CASH_RES, data);
-                            LOG_INFO("Auto cash response sent to player %s", loginname.c_str());
+                    // 发送兑现响应给玩家（只对活跃玩家发送）
+                    if (playerInGame->isActive()) {
+                        auto session = playerInGame->getSession().lock();
+                        if (session) {
+                            auto& appContext = AppContext::getInstance();
+                            auto tcpServer = appContext.getTcpServer();
+                            if (tcpServer) {
+                                // 创建兑现响应
+                                proto::MinesCashRes cashResponse;
+                                cashResponse.set_roundid(roundID_);
+                                cashResponse.set_code(0);
+                                cashResponse.set_message("Auto cash successful");
+                                cashResponse.set_playtype(playType);
+                                
+                                std::string data;
+                                cashResponse.SerializeToString(&data);
+                                tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_MINES_CASH_RES, data);
+                                LOG_INFO("Auto cash response sent to player %s", loginname.c_str());
+                            }
                         }
+                    } else {
+                        LOG_INFO("Auto cash successful for inactive player %s: playType=%d", 
+                                 loginname.c_str(), playType);
                     }
                 } else {
                     LOG_WARN("Auto cash failed for player %s: playType=%d", 
@@ -1604,7 +1615,7 @@ void MinesGame::checkAndProcessAutoCash() {
 }
 
 void MinesGame::resetAllPlayersCashOutStatus() {
-    // 注意：此方法应在gameMutex_锁保护下调用
+    // 注意：此方法应在playersMutex_锁保护下调用
     for (const auto& playerPair : players_) {
         const auto& playerInGame = playerPair.second;
         if (playerInGame) {
@@ -1616,7 +1627,7 @@ void MinesGame::resetAllPlayersCashOutStatus() {
 }
 
 bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t playType) {
-    // 直接使用players_成员变量，避免调用getPlayers()导致死锁
+
     auto playerIt = players_.find(loginname);
     if (playerIt == players_.end()) {
         LOG_ERROR("Player %s not found for internal cash out", loginname.c_str());
@@ -1665,9 +1676,15 @@ bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t pla
         }
     }
     
-    // 计算兑现金额
-    double currentMultiplier = getCurrentMultiplier();
-    bool hasMine = grid_->hasRevealedMine();
+    // 计算兑现金额 - 需要临时获取gridMutex_读锁
+    double currentMultiplier;
+    bool hasMine;
+    {
+        std::shared_lock<std::shared_mutex> gridLock(gridMutex_);
+        int revealedStars = grid_->getRevealedStarCount();
+        currentMultiplier = getMultiplierForStarCount(revealedStars);
+        hasMine = grid_->hasRevealedMine();
+    }
     
     if (hasMine) {
         currentMultiplier = 0.0;
@@ -1700,5 +1717,64 @@ bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t pla
              loginname.c_str(), playType, payoutAmount, currentMultiplier, newBalance);
     
     return true;
+}
+
+void MinesGame::handlePlayerDisconnect(const std::string& loginname) {
+    LOG_INFO("Handling player disconnect for %s", loginname.c_str());
+    
+    // 先获取玩家信息和游戏状态
+    std::shared_ptr<PlayerInGame> playerInGame;
+    GameStatus currentStatus;
+    
+    {
+        std::shared_lock<std::shared_mutex> lock(playersMutex_);
+        auto it = players_.find(loginname);
+        if (it == players_.end()) {
+            LOG_WARN("Player %s not found in game during disconnect handling", loginname.c_str());
+            return;
+        }
+        playerInGame = it->second;
+        currentStatus = getStatus();
+    }
+    
+    // 检查是否需要执行断线兑现
+    if (currentStatus == GameStatus::STOP_JETTON && playerInGame) {
+        // 检查玩家是否有需要立即兑现的玩法
+        for (int32_t playType = 1; playType <= 2; ++playType) {
+            if (!playerInGame->getAutoCashEnabled(playType) && !playerInGame->hasCashedOut(playType)) {
+                // 检查是否有该玩法的下注
+                auto betRecords = playerInGame->getBetRecords();
+                bool hasPlayTypeBet = false;
+                for (const auto& bet : betRecords) {
+                    if (std::stoi(bet.getPlayType()) == playType) {
+                        hasPlayTypeBet = true;
+                        break;
+                    }
+                }
+                
+                if (hasPlayTypeBet) {
+                    // 执行立即兑现
+                    LOG_INFO("Player %s disconnected in STOP_JETTON phase, executing immediate cash out for playType=%d", 
+                             loginname.c_str(), playType);
+                    
+                    // 调用游戏的兑现逻辑
+                    proto::MinesCashRes response;
+                    bool success = processCashOut(loginname, roundID_, playType, response);
+                    
+                    if (success) {
+                        LOG_INFO("Immediate cash out successful for disconnected player %s: playType=%d, payout=%.2f", 
+                                 loginname.c_str(), playType, 
+                                 response.has_reckon() ? response.reckon().amount() : 0.0);
+                    } else {
+                        LOG_WARN("Immediate cash out failed for disconnected player %s: playType=%d, reason=%s", 
+                                 loginname.c_str(), playType, response.message().c_str());
+                    }
+                }
+            }
+        }
+    }
+    
+    // 最后设置玩家为非活跃状态
+    setPlayerInactive(loginname);
 }
  

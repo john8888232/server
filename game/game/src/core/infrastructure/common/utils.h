@@ -26,7 +26,7 @@ std::string generateRandomString(size_t length);
 // 生成时间戳字符串
 std::string generateTimestamp();
 
-// RAII风格的性能计时器
+// 性能计时器
 class PerformanceTimer {
 public:
     enum class TimeUnit {

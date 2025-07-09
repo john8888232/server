@@ -34,10 +34,9 @@ bool GameManager::addGame(std::shared_ptr<IGame> game) {
         LOG_ERROR("Cannot add null game to manager");
         return false;
     }
-    std::string roundId = game->roundID();
     std::lock_guard<std::mutex> lock(mutex_);
     games_.push_back(game);
-    LOG_INFO("Added game %s (type: %s) to manager", roundId.c_str(), game->gameType().c_str());
+    LOG_INFO("Added game (type: %s) to manager", game->gameType().c_str());
     return true;
 }
 
@@ -62,7 +61,6 @@ bool GameManager::removeGame(std::shared_ptr<IGame> game) {
         return false;
     }
     
-    std::string roundId = game->roundID();
     std::lock_guard<std::mutex> lock(mutex_);
     
     auto it = std::find_if(games_.begin(), games_.end(),
@@ -71,7 +69,7 @@ bool GameManager::removeGame(std::shared_ptr<IGame> game) {
                           });
     
     if (it == games_.end()) {
-        LOG_WARN("Cannot remove game %s: not found", roundId.c_str());
+        LOG_WARN("Cannot remove game %s: not found", game->gameType().c_str());
         return false;
     }
     
@@ -85,7 +83,7 @@ bool GameManager::removeGame(std::shared_ptr<IGame> game) {
     }
     
     games_.erase(it);
-    LOG_INFO("Removed game %s from manager", roundId.c_str());
+    LOG_INFO("Removed game %s from manager", game->gameType().c_str());
     return true;
 }
 
@@ -96,57 +94,41 @@ bool GameManager::addPlayerToGame(std::shared_ptr<PlayerSession> player, std::sh
     }
     
     std::string loginname = player->getLoginname();
-    std::string roundId = game->roundID();
-    
-    std::shared_ptr<IGame> oldGame;
     
     {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-    // 检查玩家是否已在其他游戏中
-    auto playerGameIt = playerToGame_.find(loginname);
-    if (playerGameIt != playerToGame_.end()) {
-            oldGame = playerGameIt->second;  // 只保存引用，不调用方法
+        std::lock_guard<std::mutex> lock(mutex_);
+        
+        // 检查玩家是否已在游戏中
+        auto playerGameIt = playerToGame_.find(loginname);
+        if (playerGameIt != playerToGame_.end()) {
+            auto currentGame = playerGameIt->second;
+            if (currentGame == game) {
+                LOG_INFO("GameManager: Player %s reconnecting to same game %s", loginname.c_str(), game->gameType().c_str());
+            } else {
+                LOG_INFO("GameManager: Player %s switching from game %s to game %s", 
+                         loginname.c_str(), currentGame->gameType().c_str(), game->gameType().c_str());
+            }
+        } else {
+            LOG_INFO("GameManager: Player %s joining new game %s", loginname.c_str(), game->gameType().c_str());
         }
         
-        // 更新映射
         playerToGame_[loginname] = game;
-    }  // 释放GameManager锁
+    }  
     
-    // 在锁外调用游戏方法
-        if (oldGame) {
-        oldGame->removePlayer(loginname);  // 安全调用
-            LOG_INFO("Player %s removed from previous game %s", loginname.c_str(), oldGame->roundID().c_str());
-        }
-    
-    game->addPlayer(player);  // 安全调用
-    LOG_INFO("Player %s added to game %s", loginname.c_str(), roundId.c_str());
-    
+    LOG_INFO("GameManager: Player %s mapping updated to game %s", loginname.c_str(), game->gameType().c_str());
     return true;
 }
 
 bool GameManager::removePlayerFromGame(const std::string& loginname) {
-    std::shared_ptr<IGame> game;
-    
-    {
     std::lock_guard<std::mutex> lock(mutex_);
     
     auto playerGameIt = playerToGame_.find(loginname);
     if (playerGameIt == playerToGame_.end()) {
-        LOG_WARN("Cannot remove player %s from game: player not in any game", loginname.c_str());
+        LOG_WARN("GameManager: Cannot remove player %s from game: player not in any game", loginname.c_str());
         return false;
     }
-    
-        game = playerGameIt->second;  // 只保存引用，不调用方法
-        playerToGame_.erase(playerGameIt);
-    }  // 释放GameManager锁
-    
-    // 在锁外调用游戏方法
-    if (game) {
-        game->removePlayer(loginname);  // 安全调用
-        LOG_INFO("Player %s removed from game %s", loginname.c_str(), game->roundID().c_str());
-    }
-    
+    playerToGame_.erase(playerGameIt);
+    LOG_INFO("GameManager: Player %s mapping removed from GameManager", loginname.c_str());
     return true;
 }
 
@@ -182,15 +164,11 @@ std::vector<std::shared_ptr<IGame>> GameManager::getGamesByType(const std::strin
 
 void GameManager::cleanupFinishedGames() {
     std::vector<std::shared_ptr<IGame>> gamesToCheck;
-    
     {
-    std::lock_guard<std::mutex> lock(mutex_);
-    
-        // 收集所有游戏引用，不调用方法
+        std::lock_guard<std::mutex> lock(mutex_);
         gamesToCheck = games_;
-    }  // 释放GameManager锁
+    }   
     
-    // 在锁外检查游戏状态
     std::vector<std::shared_ptr<IGame>> gamesToRemove;
     for (const auto& game : gamesToCheck) {
         if (game && !game->inProgress() && game->getPlayers().empty()) {
@@ -225,7 +203,7 @@ void GameManager::onGameStatusChanged(std::shared_ptr<IGame> game, GameStatus ne
         return;
     }
     
-    LOG_INFO("Game %s status changed to %d", game->roundID().c_str(), static_cast<int>(newStatus));
+    LOG_INFO("Game %s status changed to %d", game->gameType().c_str(), static_cast<int>(newStatus));
     
     std::vector<GameStatusCallback> callbacks;
     {

@@ -100,7 +100,7 @@ bool LogoutHandler::canPlayerLogout(const std::string& loginname) {
             return true;
         }
 
-        GameStatus gameStatus = currentGame->gameStatus();
+        GameStatus gameStatus = currentGame->getStatus();
         
         if (gameStatus != GameStatus::START_JETTON && gameStatus != GameStatus::STOP_JETTON) {
             LOG_DEBUG("Player %s in game with status %d, allowing logout", 
@@ -129,7 +129,7 @@ bool LogoutHandler::canPlayerLogout(const std::string& loginname) {
 
         // 有下注且游戏在进行中，不允许退出
         LOG_INFO("Player %s has %d bet(s) in active game (status: %d), denying logout", 
-                 loginname.c_str(), (int)betRecords.size(), (int)gameStatus);
+                 loginname.c_str(), (int)betRecords.size(), (int)gameStatus );
         return false;
 
     } catch (const std::exception& e) {
@@ -156,11 +156,14 @@ void LogoutHandler::cleanupPlayerMappings(const std::string& sessionId, const st
         if (gameManager) {
             auto currentGame = gameManager->getPlayerGame(loginname);
             if (currentGame) {
+                // 先从游戏中移除玩家
                 currentGame->removePlayer(loginname);
                 LOG_INFO("Removed player %s from game %s", loginname.c_str(), currentGame->roundID().c_str());
             }
             
+            // 再从GameManager中移除映射
             gameManager->removePlayerFromGame(loginname);
+            LOG_INFO("Removed player %s mapping from GameManager", loginname.c_str());
         }
 
         if (tcpServer_) {

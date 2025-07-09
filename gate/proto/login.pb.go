@@ -70,7 +70,119 @@ func (x KickPlayerNotifyErrtype) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use KickPlayerNotifyErrtype.Descriptor instead.
 func (KickPlayerNotifyErrtype) EnumDescriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{5, 0}
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{11, 0}
+}
+
+type BetRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlayType      int32                  `protobuf:"varint,1,opt,name=playType,proto3" json:"playType,omitempty"` // 下注类型 mines_pro有两种下注类型,1,2分别表示下左边和右边
+	Amount        float64                `protobuf:"fixed64,2,opt,name=amount,proto3" json:"amount,omitempty"`    // 下注金额
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BetRecord) Reset() {
+	*x = BetRecord{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BetRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BetRecord) ProtoMessage() {}
+
+func (x *BetRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BetRecord.ProtoReflect.Descriptor instead.
+func (*BetRecord) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *BetRecord) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+func (x *BetRecord) GetAmount() float64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+type ReckonRecord struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlayType      int32                  `protobuf:"varint,1,opt,name=playType,proto3" json:"playType,omitempty"` // 类型 mines_pro有两种下注类型,1,2分别表示下左边和右边
+	Amount        float64                `protobuf:"fixed64,2,opt,name=amount,proto3" json:"amount,omitempty"`    // 派奖金额
+	Multi         float64                `protobuf:"fixed64,3,opt,name=multi,proto3" json:"multi,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReckonRecord) Reset() {
+	*x = ReckonRecord{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReckonRecord) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReckonRecord) ProtoMessage() {}
+
+func (x *ReckonRecord) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReckonRecord.ProtoReflect.Descriptor instead.
+func (*ReckonRecord) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ReckonRecord) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+func (x *ReckonRecord) GetAmount() float64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *ReckonRecord) GetMulti() float64 {
+	if x != nil {
+		return x.Multi
+	}
+	return 0
 }
 
 type PlayerInfo struct {
@@ -87,7 +199,7 @@ type PlayerInfo struct {
 
 func (x *PlayerInfo) Reset() {
 	*x = PlayerInfo{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[0]
+	mi := &file_internal_model_proto_login_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -99,7 +211,7 @@ func (x *PlayerInfo) String() string {
 func (*PlayerInfo) ProtoMessage() {}
 
 func (x *PlayerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[0]
+	mi := &file_internal_model_proto_login_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -112,7 +224,7 @@ func (x *PlayerInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerInfo.ProtoReflect.Descriptor instead.
 func (*PlayerInfo) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{0}
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PlayerInfo) GetUsername() string {
@@ -157,6 +269,172 @@ func (x *PlayerInfo) GetCurrency() string {
 	return ""
 }
 
+// 玩家的游戏快照信息
+type PlayerInfoSnap struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Info          *PlayerInfo            `protobuf:"bytes,1,opt,name=info,proto3" json:"info,omitempty"`       // 玩家基本信息
+	Bets          []*BetRecord           `protobuf:"bytes,2,rep,name=bets,proto3" json:"bets,omitempty"`       // 玩家下注记录
+	Reckons       []*ReckonRecord        `protobuf:"bytes,3,rep,name=reckons,proto3" json:"reckons,omitempty"` // 玩家派奖记录
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PlayerInfoSnap) Reset() {
+	*x = PlayerInfoSnap{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlayerInfoSnap) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlayerInfoSnap) ProtoMessage() {}
+
+func (x *PlayerInfoSnap) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlayerInfoSnap.ProtoReflect.Descriptor instead.
+func (*PlayerInfoSnap) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PlayerInfoSnap) GetInfo() *PlayerInfo {
+	if x != nil {
+		return x.Info
+	}
+	return nil
+}
+
+func (x *PlayerInfoSnap) GetBets() []*BetRecord {
+	if x != nil {
+		return x.Bets
+	}
+	return nil
+}
+
+func (x *PlayerInfoSnap) GetReckons() []*ReckonRecord {
+	if x != nil {
+		return x.Reckons
+	}
+	return nil
+}
+
+type GameResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        int32                  `protobuf:"varint,1,opt,name=result,proto3" json:"result,omitempty"` // mines_pro 1-未翻开 2-已翻开(星星) 3-已翻开(炸弹) 4-未翻开(星星) 5-未翻开(炸弹)
+	Multi         float64                `protobuf:"fixed64,2,opt,name=multi,proto3" json:"multi,omitempty"`  // mines_pro用,倍数
+	Index         int32                  `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`   // mines_pro用,索引
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GameResult) Reset() {
+	*x = GameResult{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GameResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GameResult) ProtoMessage() {}
+
+func (x *GameResult) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GameResult.ProtoReflect.Descriptor instead.
+func (*GameResult) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GameResult) GetResult() int32 {
+	if x != nil {
+		return x.Result
+	}
+	return 0
+}
+
+func (x *GameResult) GetMulti() float64 {
+	if x != nil {
+		return x.Multi
+	}
+	return 0
+}
+
+func (x *GameResult) GetIndex() int32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+// 0x11000 - 心跳包
+type HeartBeat struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartBeat) Reset() {
+	*x = HeartBeat{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartBeat) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartBeat) ProtoMessage() {}
+
+func (x *HeartBeat) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartBeat.ProtoReflect.Descriptor instead.
+func (*HeartBeat) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *HeartBeat) GetTimestamp() int64 {
+	if x != nil {
+		return x.Timestamp
+	}
+	return 0
+}
+
 // 0x11001
 type LoginReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -171,7 +449,7 @@ type LoginReq struct {
 
 func (x *LoginReq) Reset() {
 	*x = LoginReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[1]
+	mi := &file_internal_model_proto_login_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -183,7 +461,7 @@ func (x *LoginReq) String() string {
 func (*LoginReq) ProtoMessage() {}
 
 func (x *LoginReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[1]
+	mi := &file_internal_model_proto_login_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -196,7 +474,7 @@ func (x *LoginReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginReq.ProtoReflect.Descriptor instead.
 func (*LoginReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{1}
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *LoginReq) GetLoginname() string {
@@ -247,7 +525,7 @@ type LoginResp struct {
 
 func (x *LoginResp) Reset() {
 	*x = LoginResp{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[2]
+	mi := &file_internal_model_proto_login_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -259,7 +537,7 @@ func (x *LoginResp) String() string {
 func (*LoginResp) ProtoMessage() {}
 
 func (x *LoginResp) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[2]
+	mi := &file_internal_model_proto_login_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -272,7 +550,7 @@ func (x *LoginResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginResp.ProtoReflect.Descriptor instead.
 func (*LoginResp) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{2}
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LoginResp) GetLoginname() string {
@@ -303,29 +581,29 @@ func (x *LoginResp) GetInfo() *PlayerInfo {
 	return nil
 }
 
-// 0x11000 - 心跳包
-type HeartBeat struct {
+// 0x11003 - 登出请求
+type LogoutReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Timestamp     int64                  `protobuf:"varint,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
+	Loginname     string                 `protobuf:"bytes,1,opt,name=loginname,proto3" json:"loginname,omitempty"` // 登录名
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *HeartBeat) Reset() {
-	*x = HeartBeat{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[3]
+func (x *LogoutReq) Reset() {
+	*x = LogoutReq{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *HeartBeat) String() string {
+func (x *LogoutReq) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*HeartBeat) ProtoMessage() {}
+func (*LogoutReq) ProtoMessage() {}
 
-func (x *HeartBeat) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[3]
+func (x *LogoutReq) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -336,16 +614,77 @@ func (x *HeartBeat) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use HeartBeat.ProtoReflect.Descriptor instead.
-func (*HeartBeat) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use LogoutReq.ProtoReflect.Descriptor instead.
+func (*LogoutReq) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *HeartBeat) GetTimestamp() int64 {
+func (x *LogoutReq) GetLoginname() string {
 	if x != nil {
-		return x.Timestamp
+		return x.Loginname
+	}
+	return ""
+}
+
+// 0x11004 - 登出响应
+type LogoutRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loginname     string                 `protobuf:"bytes,1,opt,name=loginname,proto3" json:"loginname,omitempty"` // 登录名
+	Code          int32                  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`          // 0-成功 1-失败
+	Msg           string                 `protobuf:"bytes,3,opt,name=msg,proto3" json:"msg,omitempty"`             // 消息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutRes) Reset() {
+	*x = LogoutRes{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutRes) ProtoMessage() {}
+
+func (x *LogoutRes) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutRes.ProtoReflect.Descriptor instead.
+func (*LogoutRes) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *LogoutRes) GetLoginname() string {
+	if x != nil {
+		return x.Loginname
+	}
+	return ""
+}
+
+func (x *LogoutRes) GetCode() int32 {
+	if x != nil {
+		return x.Code
 	}
 	return 0
+}
+
+func (x *LogoutRes) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
 }
 
 // 0x10001 gate -> game
@@ -357,7 +696,7 @@ type ConnClose struct {
 
 func (x *ConnClose) Reset() {
 	*x = ConnClose{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[4]
+	mi := &file_internal_model_proto_login_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -369,7 +708,7 @@ func (x *ConnClose) String() string {
 func (*ConnClose) ProtoMessage() {}
 
 func (x *ConnClose) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[4]
+	mi := &file_internal_model_proto_login_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -382,7 +721,7 @@ func (x *ConnClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnClose.ProtoReflect.Descriptor instead.
 func (*ConnClose) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{4}
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{10}
 }
 
 // 0x11006 - 踢出玩家通知
@@ -397,7 +736,7 @@ type KickPlayerNotify struct {
 
 func (x *KickPlayerNotify) Reset() {
 	*x = KickPlayerNotify{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[5]
+	mi := &file_internal_model_proto_login_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -409,7 +748,7 @@ func (x *KickPlayerNotify) String() string {
 func (*KickPlayerNotify) ProtoMessage() {}
 
 func (x *KickPlayerNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[5]
+	mi := &file_internal_model_proto_login_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -422,7 +761,7 @@ func (x *KickPlayerNotify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KickPlayerNotify.ProtoReflect.Descriptor instead.
 func (*KickPlayerNotify) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{5}
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *KickPlayerNotify) GetSessionId() string {
@@ -439,11 +778,894 @@ func (x *KickPlayerNotify) GetReason() KickPlayerNotifyErrtype {
 	return KickPlayerNotify_NORMAL
 }
 
+// 0x11008 - 游戏快照通知
+type GameSnapshotNotify struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"`        // 游戏回合ID
+	GameType      string                 `protobuf:"bytes,2,opt,name=gameType,proto3" json:"gameType,omitempty"`      // 游戏类型
+	Status        int32                  `protobuf:"varint,3,opt,name=status,proto3" json:"status,omitempty"`         // 游戏状态 0-init 1-start jetton 2-stop jetton 3-settled
+	RemainTime    int64                  `protobuf:"varint,4,opt,name=remainTime,proto3" json:"remainTime,omitempty"` // 游戏剩余时间（秒）
+	CurIndex      int32                  `protobuf:"varint,5,opt,name=curIndex,proto3" json:"curIndex,omitempty"`     // 当前索引(mines_pro用)状态2有效
+	CurMulti      float64                `protobuf:"fixed64,6,opt,name=curMulti,proto3" json:"curMulti,omitempty"`    // 当前倍数(mines_pro用)状态2有效
+	Result        []*GameResult          `protobuf:"bytes,7,rep,name=result,proto3" json:"result,omitempty"`          // 游戏结果 状态1、2、3有效
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GameSnapshotNotify) Reset() {
+	*x = GameSnapshotNotify{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GameSnapshotNotify) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GameSnapshotNotify) ProtoMessage() {}
+
+func (x *GameSnapshotNotify) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GameSnapshotNotify.ProtoReflect.Descriptor instead.
+func (*GameSnapshotNotify) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GameSnapshotNotify) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *GameSnapshotNotify) GetGameType() string {
+	if x != nil {
+		return x.GameType
+	}
+	return ""
+}
+
+func (x *GameSnapshotNotify) GetStatus() int32 {
+	if x != nil {
+		return x.Status
+	}
+	return 0
+}
+
+func (x *GameSnapshotNotify) GetRemainTime() int64 {
+	if x != nil {
+		return x.RemainTime
+	}
+	return 0
+}
+
+func (x *GameSnapshotNotify) GetCurIndex() int32 {
+	if x != nil {
+		return x.CurIndex
+	}
+	return 0
+}
+
+func (x *GameSnapshotNotify) GetCurMulti() float64 {
+	if x != nil {
+		return x.CurMulti
+	}
+	return 0
+}
+
+func (x *GameSnapshotNotify) GetResult() []*GameResult {
+	if x != nil {
+		return x.Result
+	}
+	return nil
+}
+
+// 0x20001 - 下注请求
+type MinesPlaceBetReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loginname     string                 `protobuf:"bytes,1,opt,name=loginname,proto3" json:"loginname,omitempty"` // 玩家登录名
+	RoundId       string                 `protobuf:"bytes,2,opt,name=roundId,proto3" json:"roundId,omitempty"`     // 游戏回合ID
+	PlayType      int32                  `protobuf:"varint,3,opt,name=playType,proto3" json:"playType,omitempty"`  // 下注类型 1-左边 2-右边
+	Amount        float64                `protobuf:"fixed64,4,opt,name=amount,proto3" json:"amount,omitempty"`     // 下注金额
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesPlaceBetReq) Reset() {
+	*x = MinesPlaceBetReq{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesPlaceBetReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesPlaceBetReq) ProtoMessage() {}
+
+func (x *MinesPlaceBetReq) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesPlaceBetReq.ProtoReflect.Descriptor instead.
+func (*MinesPlaceBetReq) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *MinesPlaceBetReq) GetLoginname() string {
+	if x != nil {
+		return x.Loginname
+	}
+	return ""
+}
+
+func (x *MinesPlaceBetReq) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesPlaceBetReq) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+func (x *MinesPlaceBetReq) GetAmount() float64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+// 0x20002 - 下注响应
+type MinesPlaceBetRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          int32                  `protobuf:"varint,1,opt,name=code,proto3" json:"code,omitempty"`      // 0-成功 其他-失败
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"` // 错误信息
+	RoundId       string                 `protobuf:"bytes,3,opt,name=roundId,proto3" json:"roundId,omitempty"` // 游戏回合ID
+	Bet           *BetRecord             `protobuf:"bytes,4,opt,name=bet,proto3" json:"bet,omitempty"`
+	Balance       float64                `protobuf:"fixed64,5,opt,name=balance,proto3" json:"balance,omitempty"` // 下注后余额
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesPlaceBetRes) Reset() {
+	*x = MinesPlaceBetRes{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesPlaceBetRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesPlaceBetRes) ProtoMessage() {}
+
+func (x *MinesPlaceBetRes) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesPlaceBetRes.ProtoReflect.Descriptor instead.
+func (*MinesPlaceBetRes) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *MinesPlaceBetRes) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *MinesPlaceBetRes) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *MinesPlaceBetRes) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesPlaceBetRes) GetBet() *BetRecord {
+	if x != nil {
+		return x.Bet
+	}
+	return nil
+}
+
+func (x *MinesPlaceBetRes) GetBalance() float64 {
+	if x != nil {
+		return x.Balance
+	}
+	return 0
+}
+
+// 0x20003 - 设置自动兑现请求
+type MinesAutoCashReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loginname     string                 `protobuf:"bytes,1,opt,name=loginname,proto3" json:"loginname,omitempty"` // 玩家登录名
+	RoundId       string                 `protobuf:"bytes,2,opt,name=roundId,proto3" json:"roundId,omitempty"`
+	PlayType      int32                  `protobuf:"varint,3,opt,name=playType,proto3" json:"playType,omitempty"` // 兑现玩法 1-左边 2-右边
+	Enable        int32                  `protobuf:"varint,4,opt,name=enable,proto3" json:"enable,omitempty"`     // 是否启用自动兑现 0-不启用 1-启用
+	Grid          int32                  `protobuf:"varint,5,opt,name=grid,proto3" json:"grid,omitempty"`         // 目标格子（当达到时自动兑现）
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesAutoCashReq) Reset() {
+	*x = MinesAutoCashReq{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesAutoCashReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesAutoCashReq) ProtoMessage() {}
+
+func (x *MinesAutoCashReq) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesAutoCashReq.ProtoReflect.Descriptor instead.
+func (*MinesAutoCashReq) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *MinesAutoCashReq) GetLoginname() string {
+	if x != nil {
+		return x.Loginname
+	}
+	return ""
+}
+
+func (x *MinesAutoCashReq) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesAutoCashReq) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+func (x *MinesAutoCashReq) GetEnable() int32 {
+	if x != nil {
+		return x.Enable
+	}
+	return 0
+}
+
+func (x *MinesAutoCashReq) GetGrid() int32 {
+	if x != nil {
+		return x.Grid
+	}
+	return 0
+}
+
+// 0x20004 - 设置自动兑现响应
+type MinesAutoCashRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"`
+	Code          int32                  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`         // 0-成功 其他-失败
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`    // 错误信息
+	Enable        int32                  `protobuf:"varint,4,opt,name=enable,proto3" json:"enable,omitempty"`     // 0-不启用 1-启用
+	Grid          int32                  `protobuf:"varint,5,opt,name=grid,proto3" json:"grid,omitempty"`         // 目标格子
+	PlayType      int32                  `protobuf:"varint,6,opt,name=playType,proto3" json:"playType,omitempty"` // 兑现玩法 1-左边 2-右边
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesAutoCashRes) Reset() {
+	*x = MinesAutoCashRes{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesAutoCashRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesAutoCashRes) ProtoMessage() {}
+
+func (x *MinesAutoCashRes) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesAutoCashRes.ProtoReflect.Descriptor instead.
+func (*MinesAutoCashRes) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *MinesAutoCashRes) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesAutoCashRes) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *MinesAutoCashRes) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *MinesAutoCashRes) GetEnable() int32 {
+	if x != nil {
+		return x.Enable
+	}
+	return 0
+}
+
+func (x *MinesAutoCashRes) GetGrid() int32 {
+	if x != nil {
+		return x.Grid
+	}
+	return 0
+}
+
+func (x *MinesAutoCashRes) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+// 0x20005 - 手动兑现请求
+type MinesCashReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loginname     string                 `protobuf:"bytes,1,opt,name=loginname,proto3" json:"loginname,omitempty"` // 玩家登录名
+	RoundId       string                 `protobuf:"bytes,2,opt,name=roundId,proto3" json:"roundId,omitempty"`     // 游戏回合ID
+	PlayType      int32                  `protobuf:"varint,3,opt,name=playType,proto3" json:"playType,omitempty"`  // 兑现玩法 1-左边 2-右边
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesCashReq) Reset() {
+	*x = MinesCashReq{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesCashReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesCashReq) ProtoMessage() {}
+
+func (x *MinesCashReq) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesCashReq.ProtoReflect.Descriptor instead.
+func (*MinesCashReq) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *MinesCashReq) GetLoginname() string {
+	if x != nil {
+		return x.Loginname
+	}
+	return ""
+}
+
+func (x *MinesCashReq) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesCashReq) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+// 0x20006 - 兑现响应(手动自动通用)
+type MinesCashRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"`
+	Code          int32                  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`      // 0-成功 其他-失败
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"` // 错误信息
+	Reckon        *ReckonRecord          `protobuf:"bytes,4,opt,name=reckon,proto3" json:"reckon,omitempty"`
+	Balance       float64                `protobuf:"fixed64,5,opt,name=balance,proto3" json:"balance,omitempty"`  // 兑现后余额
+	PlayType      int32                  `protobuf:"varint,6,opt,name=playType,proto3" json:"playType,omitempty"` // 兑现玩法 1-左边 2-右边
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesCashRes) Reset() {
+	*x = MinesCashRes{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesCashRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesCashRes) ProtoMessage() {}
+
+func (x *MinesCashRes) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesCashRes.ProtoReflect.Descriptor instead.
+func (*MinesCashRes) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *MinesCashRes) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesCashRes) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *MinesCashRes) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *MinesCashRes) GetReckon() *ReckonRecord {
+	if x != nil {
+		return x.Reckon
+	}
+	return nil
+}
+
+func (x *MinesCashRes) GetBalance() float64 {
+	if x != nil {
+		return x.Balance
+	}
+	return 0
+}
+
+func (x *MinesCashRes) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+// 0x20007 - 取消下注请求
+type MinesCancelBetReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Loginname     string                 `protobuf:"bytes,1,opt,name=loginname,proto3" json:"loginname,omitempty"` // 玩家登录名
+	RoundId       string                 `protobuf:"bytes,2,opt,name=roundId,proto3" json:"roundId,omitempty"`     // 游戏回合ID
+	PlayType      int32                  `protobuf:"varint,3,opt,name=playType,proto3" json:"playType,omitempty"`  // 下注类型 1-左边 2-右边 0-全部取消
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesCancelBetReq) Reset() {
+	*x = MinesCancelBetReq{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesCancelBetReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesCancelBetReq) ProtoMessage() {}
+
+func (x *MinesCancelBetReq) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesCancelBetReq.ProtoReflect.Descriptor instead.
+func (*MinesCancelBetReq) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *MinesCancelBetReq) GetLoginname() string {
+	if x != nil {
+		return x.Loginname
+	}
+	return ""
+}
+
+func (x *MinesCancelBetReq) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesCancelBetReq) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+// 0x20008 - 取消下注响应
+type MinesCancelBetRes struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"`             // 游戏回合ID
+	Code          int32                  `protobuf:"varint,2,opt,name=code,proto3" json:"code,omitempty"`                  // 0-成功 其他-失败
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`             // 错误信息
+	RefundAmount  float64                `protobuf:"fixed64,4,opt,name=refundAmount,proto3" json:"refundAmount,omitempty"` // 退还金额
+	Balance       float64                `protobuf:"fixed64,5,opt,name=balance,proto3" json:"balance,omitempty"`           // 取消后余额
+	PlayType      int32                  `protobuf:"varint,6,opt,name=playType,proto3" json:"playType,omitempty"`          // 下注类型 1-左边 2-右边 0-全部取消
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesCancelBetRes) Reset() {
+	*x = MinesCancelBetRes{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesCancelBetRes) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesCancelBetRes) ProtoMessage() {}
+
+func (x *MinesCancelBetRes) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesCancelBetRes.ProtoReflect.Descriptor instead.
+func (*MinesCancelBetRes) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *MinesCancelBetRes) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesCancelBetRes) GetCode() int32 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *MinesCancelBetRes) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *MinesCancelBetRes) GetRefundAmount() float64 {
+	if x != nil {
+		return x.RefundAmount
+	}
+	return 0
+}
+
+func (x *MinesCancelBetRes) GetBalance() float64 {
+	if x != nil {
+		return x.Balance
+	}
+	return 0
+}
+
+func (x *MinesCancelBetRes) GetPlayType() int32 {
+	if x != nil {
+		return x.PlayType
+	}
+	return 0
+}
+
+// 0x2000A - 开始下注
+type MinesStartJettonNotify struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"` // 回合ID
+	Gametype      string                 `protobuf:"bytes,2,opt,name=gametype,proto3" json:"gametype,omitempty"`
+	Duration      int64                  `protobuf:"varint,3,opt,name=duration,proto3" json:"duration,omitempty"` // 下注持续时间（秒）
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MinesStartJettonNotify) Reset() {
+	*x = MinesStartJettonNotify{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MinesStartJettonNotify) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MinesStartJettonNotify) ProtoMessage() {}
+
+func (x *MinesStartJettonNotify) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MinesStartJettonNotify.ProtoReflect.Descriptor instead.
+func (*MinesStartJettonNotify) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *MinesStartJettonNotify) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *MinesStartJettonNotify) GetGametype() string {
+	if x != nil {
+		return x.Gametype
+	}
+	return ""
+}
+
+func (x *MinesStartJettonNotify) GetDuration() int64 {
+	if x != nil {
+		return x.Duration
+	}
+	return 0
+}
+
+// 0x2000C - 停止下注
+type GameStopJettonNotify struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"`    // 游戏回合ID
+	GameType      string                 `protobuf:"bytes,2,opt,name=gameType,proto3" json:"gameType,omitempty"`  // 游戏类型
+	StopTime      int64                  `protobuf:"varint,3,opt,name=stopTime,proto3" json:"stopTime,omitempty"` // 停止时间戳
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GameStopJettonNotify) Reset() {
+	*x = GameStopJettonNotify{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GameStopJettonNotify) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GameStopJettonNotify) ProtoMessage() {}
+
+func (x *GameStopJettonNotify) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GameStopJettonNotify.ProtoReflect.Descriptor instead.
+func (*GameStopJettonNotify) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GameStopJettonNotify) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *GameStopJettonNotify) GetGameType() string {
+	if x != nil {
+		return x.GameType
+	}
+	return ""
+}
+
+func (x *GameStopJettonNotify) GetStopTime() int64 {
+	if x != nil {
+		return x.StopTime
+	}
+	return 0
+}
+
+// 0x2000E - 榜单-start jetton 和 stop jetton 阶段每秒推送一次
+type GameRankInfoNotify struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoundId       string                 `protobuf:"bytes,1,opt,name=roundId,proto3" json:"roundId,omitempty"`   // 游戏回合ID
+	GameType      string                 `protobuf:"bytes,2,opt,name=gameType,proto3" json:"gameType,omitempty"` // 游戏类型
+	Players       []*PlayerInfoSnap      `protobuf:"bytes,3,rep,name=players,proto3" json:"players,omitempty"`   // 榜单信息
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GameRankInfoNotify) Reset() {
+	*x = GameRankInfoNotify{}
+	mi := &file_internal_model_proto_login_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GameRankInfoNotify) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GameRankInfoNotify) ProtoMessage() {}
+
+func (x *GameRankInfoNotify) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_model_proto_login_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GameRankInfoNotify.ProtoReflect.Descriptor instead.
+func (*GameRankInfoNotify) Descriptor() ([]byte, []int) {
+	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GameRankInfoNotify) GetRoundId() string {
+	if x != nil {
+		return x.RoundId
+	}
+	return ""
+}
+
+func (x *GameRankInfoNotify) GetGameType() string {
+	if x != nil {
+		return x.GameType
+	}
+	return ""
+}
+
+func (x *GameRankInfoNotify) GetPlayers() []*PlayerInfoSnap {
+	if x != nil {
+		return x.Players
+	}
+	return nil
+}
+
 var File_internal_model_proto_login_proto protoreflect.FileDescriptor
 
 const file_internal_model_proto_login_proto_rawDesc = "" +
 	"\n" +
-	" internal/model/proto/login.proto\x12\x05proto\"\xa4\x01\n" +
+	" internal/model/proto/login.proto\x12\x05proto\"?\n" +
+	"\tBetRecord\x12\x1a\n" +
+	"\bplayType\x18\x01 \x01(\x05R\bplayType\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x01R\x06amount\"X\n" +
+	"\fReckonRecord\x12\x1a\n" +
+	"\bplayType\x18\x01 \x01(\x05R\bplayType\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12\x14\n" +
+	"\x05multi\x18\x03 \x01(\x01R\x05multi\"\xa4\x01\n" +
 	"\n" +
 	"PlayerInfo\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
@@ -451,7 +1673,18 @@ const file_internal_model_proto_login_proto_rawDesc = "" +
 	"\x06avatar\x18\x03 \x01(\tR\x06avatar\x12\x10\n" +
 	"\x03vip\x18\x04 \x01(\x05R\x03vip\x12\x18\n" +
 	"\abalance\x18\x05 \x01(\x01R\abalance\x12\x1a\n" +
-	"\bcurrency\x18\x06 \x01(\tR\bcurrency\"\x92\x01\n" +
+	"\bcurrency\x18\x06 \x01(\tR\bcurrency\"\x8c\x01\n" +
+	"\x0ePlayerInfoSnap\x12%\n" +
+	"\x04info\x18\x01 \x01(\v2\x11.proto.PlayerInfoR\x04info\x12$\n" +
+	"\x04bets\x18\x02 \x03(\v2\x10.proto.BetRecordR\x04bets\x12-\n" +
+	"\areckons\x18\x03 \x03(\v2\x13.proto.ReckonRecordR\areckons\"P\n" +
+	"\n" +
+	"GameResult\x12\x16\n" +
+	"\x06result\x18\x01 \x01(\x05R\x06result\x12\x14\n" +
+	"\x05multi\x18\x02 \x01(\x01R\x05multi\x12\x14\n" +
+	"\x05index\x18\x03 \x01(\x05R\x05index\")\n" +
+	"\tHeartBeat\x12\x1c\n" +
+	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\"\x92\x01\n" +
 	"\bLoginReq\x12\x1c\n" +
 	"\tloginname\x18\x01 \x01(\tR\tloginname\x12\x14\n" +
 	"\x05token\x18\x02 \x01(\tR\x05token\x12\x1b\n" +
@@ -463,8 +1696,12 @@ const file_internal_model_proto_login_proto_rawDesc = "" +
 	"\x04code\x18\x02 \x01(\x05R\x04code\x12\x18\n" +
 	"\amessage\x18\x03 \x01(\tR\amessage\x12%\n" +
 	"\x04info\x18\x04 \x01(\v2\x11.proto.PlayerInfoR\x04info\")\n" +
-	"\tHeartBeat\x12\x1c\n" +
-	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\"\v\n" +
+	"\tLogoutReq\x12\x1c\n" +
+	"\tloginname\x18\x01 \x01(\tR\tloginname\"O\n" +
+	"\tLogoutRes\x12\x1c\n" +
+	"\tloginname\x18\x01 \x01(\tR\tloginname\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\x12\x10\n" +
+	"\x03msg\x18\x03 \x01(\tR\x03msg\"\v\n" +
 	"\tConnClose\"\xb0\x01\n" +
 	"\x10KickPlayerNotify\x12\x1c\n" +
 	"\tsessionId\x18\x01 \x01(\tR\tsessionId\x127\n" +
@@ -474,7 +1711,75 @@ const file_internal_model_proto_login_proto_rawDesc = "" +
 	"\x06NORMAL\x10\x00\x12\f\n" +
 	"\bINACTIVE\x10\x01\x12\x13\n" +
 	"\x0fLOGINOTHERPLACE\x10\x02\x12\v\n" +
-	"\aINVALID\x10\x03B\n" +
+	"\aINVALID\x10\x03\"\xe5\x01\n" +
+	"\x12GameSnapshotNotify\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bgameType\x18\x02 \x01(\tR\bgameType\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\x05R\x06status\x12\x1e\n" +
+	"\n" +
+	"remainTime\x18\x04 \x01(\x03R\n" +
+	"remainTime\x12\x1a\n" +
+	"\bcurIndex\x18\x05 \x01(\x05R\bcurIndex\x12\x1a\n" +
+	"\bcurMulti\x18\x06 \x01(\x01R\bcurMulti\x12)\n" +
+	"\x06result\x18\a \x03(\v2\x11.proto.GameResultR\x06result\"~\n" +
+	"\x10MinesPlaceBetReq\x12\x1c\n" +
+	"\tloginname\x18\x01 \x01(\tR\tloginname\x12\x18\n" +
+	"\aroundId\x18\x02 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bplayType\x18\x03 \x01(\x05R\bplayType\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x01R\x06amount\"\x98\x01\n" +
+	"\x10MinesPlaceBetRes\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\x05R\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x18\n" +
+	"\aroundId\x18\x03 \x01(\tR\aroundId\x12\"\n" +
+	"\x03bet\x18\x04 \x01(\v2\x10.proto.BetRecordR\x03bet\x12\x18\n" +
+	"\abalance\x18\x05 \x01(\x01R\abalance\"\x92\x01\n" +
+	"\x10MinesAutoCashReq\x12\x1c\n" +
+	"\tloginname\x18\x01 \x01(\tR\tloginname\x12\x18\n" +
+	"\aroundId\x18\x02 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bplayType\x18\x03 \x01(\x05R\bplayType\x12\x16\n" +
+	"\x06enable\x18\x04 \x01(\x05R\x06enable\x12\x12\n" +
+	"\x04grid\x18\x05 \x01(\x05R\x04grid\"\xa2\x01\n" +
+	"\x10MinesAutoCashRes\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\x16\n" +
+	"\x06enable\x18\x04 \x01(\x05R\x06enable\x12\x12\n" +
+	"\x04grid\x18\x05 \x01(\x05R\x04grid\x12\x1a\n" +
+	"\bplayType\x18\x06 \x01(\x05R\bplayType\"b\n" +
+	"\fMinesCashReq\x12\x1c\n" +
+	"\tloginname\x18\x01 \x01(\tR\tloginname\x12\x18\n" +
+	"\aroundId\x18\x02 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bplayType\x18\x03 \x01(\x05R\bplayType\"\xb9\x01\n" +
+	"\fMinesCashRes\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12+\n" +
+	"\x06reckon\x18\x04 \x01(\v2\x13.proto.ReckonRecordR\x06reckon\x12\x18\n" +
+	"\abalance\x18\x05 \x01(\x01R\abalance\x12\x1a\n" +
+	"\bplayType\x18\x06 \x01(\x05R\bplayType\"g\n" +
+	"\x11MinesCancelBetReq\x12\x1c\n" +
+	"\tloginname\x18\x01 \x01(\tR\tloginname\x12\x18\n" +
+	"\aroundId\x18\x02 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bplayType\x18\x03 \x01(\x05R\bplayType\"\xb5\x01\n" +
+	"\x11MinesCancelBetRes\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\x05R\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\"\n" +
+	"\frefundAmount\x18\x04 \x01(\x01R\frefundAmount\x12\x18\n" +
+	"\abalance\x18\x05 \x01(\x01R\abalance\x12\x1a\n" +
+	"\bplayType\x18\x06 \x01(\x05R\bplayType\"j\n" +
+	"\x16MinesStartJettonNotify\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bgametype\x18\x02 \x01(\tR\bgametype\x12\x1a\n" +
+	"\bduration\x18\x03 \x01(\x03R\bduration\"h\n" +
+	"\x14GameStopJettonNotify\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bgameType\x18\x02 \x01(\tR\bgameType\x12\x1a\n" +
+	"\bstopTime\x18\x03 \x01(\x03R\bstopTime\"{\n" +
+	"\x12GameRankInfoNotify\x12\x18\n" +
+	"\aroundId\x18\x01 \x01(\tR\aroundId\x12\x1a\n" +
+	"\bgameType\x18\x02 \x01(\tR\bgameType\x12/\n" +
+	"\aplayers\x18\x03 \x03(\v2\x15.proto.PlayerInfoSnapR\aplayersB\n" +
 	"Z\b./;protob\x06proto3"
 
 var (
@@ -490,24 +1795,49 @@ func file_internal_model_proto_login_proto_rawDescGZIP() []byte {
 }
 
 var file_internal_model_proto_login_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_model_proto_login_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_internal_model_proto_login_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_internal_model_proto_login_proto_goTypes = []any{
-	(KickPlayerNotifyErrtype)(0), // 0: proto.KickPlayerNotify.errtype
-	(*PlayerInfo)(nil),           // 1: proto.PlayerInfo
-	(*LoginReq)(nil),             // 2: proto.LoginReq
-	(*LoginResp)(nil),            // 3: proto.LoginResp
-	(*HeartBeat)(nil),            // 4: proto.HeartBeat
-	(*ConnClose)(nil),            // 5: proto.ConnClose
-	(*KickPlayerNotify)(nil),     // 6: proto.KickPlayerNotify
+	(KickPlayerNotifyErrtype)(0),   // 0: proto.KickPlayerNotify.errtype
+	(*BetRecord)(nil),              // 1: proto.BetRecord
+	(*ReckonRecord)(nil),           // 2: proto.ReckonRecord
+	(*PlayerInfo)(nil),             // 3: proto.PlayerInfo
+	(*PlayerInfoSnap)(nil),         // 4: proto.PlayerInfoSnap
+	(*GameResult)(nil),             // 5: proto.GameResult
+	(*HeartBeat)(nil),              // 6: proto.HeartBeat
+	(*LoginReq)(nil),               // 7: proto.LoginReq
+	(*LoginResp)(nil),              // 8: proto.LoginResp
+	(*LogoutReq)(nil),              // 9: proto.LogoutReq
+	(*LogoutRes)(nil),              // 10: proto.LogoutRes
+	(*ConnClose)(nil),              // 11: proto.ConnClose
+	(*KickPlayerNotify)(nil),       // 12: proto.KickPlayerNotify
+	(*GameSnapshotNotify)(nil),     // 13: proto.GameSnapshotNotify
+	(*MinesPlaceBetReq)(nil),       // 14: proto.MinesPlaceBetReq
+	(*MinesPlaceBetRes)(nil),       // 15: proto.MinesPlaceBetRes
+	(*MinesAutoCashReq)(nil),       // 16: proto.MinesAutoCashReq
+	(*MinesAutoCashRes)(nil),       // 17: proto.MinesAutoCashRes
+	(*MinesCashReq)(nil),           // 18: proto.MinesCashReq
+	(*MinesCashRes)(nil),           // 19: proto.MinesCashRes
+	(*MinesCancelBetReq)(nil),      // 20: proto.MinesCancelBetReq
+	(*MinesCancelBetRes)(nil),      // 21: proto.MinesCancelBetRes
+	(*MinesStartJettonNotify)(nil), // 22: proto.MinesStartJettonNotify
+	(*GameStopJettonNotify)(nil),   // 23: proto.GameStopJettonNotify
+	(*GameRankInfoNotify)(nil),     // 24: proto.GameRankInfoNotify
 }
 var file_internal_model_proto_login_proto_depIdxs = []int32{
-	1, // 0: proto.LoginResp.info:type_name -> proto.PlayerInfo
-	0, // 1: proto.KickPlayerNotify.reason:type_name -> proto.KickPlayerNotify.errtype
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 0: proto.PlayerInfoSnap.info:type_name -> proto.PlayerInfo
+	1, // 1: proto.PlayerInfoSnap.bets:type_name -> proto.BetRecord
+	2, // 2: proto.PlayerInfoSnap.reckons:type_name -> proto.ReckonRecord
+	3, // 3: proto.LoginResp.info:type_name -> proto.PlayerInfo
+	0, // 4: proto.KickPlayerNotify.reason:type_name -> proto.KickPlayerNotify.errtype
+	5, // 5: proto.GameSnapshotNotify.result:type_name -> proto.GameResult
+	1, // 6: proto.MinesPlaceBetRes.bet:type_name -> proto.BetRecord
+	2, // 7: proto.MinesCashRes.reckon:type_name -> proto.ReckonRecord
+	4, // 8: proto.GameRankInfoNotify.players:type_name -> proto.PlayerInfoSnap
+	9, // [9:9] is the sub-list for method output_type
+	9, // [9:9] is the sub-list for method input_type
+	9, // [9:9] is the sub-list for extension type_name
+	9, // [9:9] is the sub-list for extension extendee
+	0, // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_internal_model_proto_login_proto_init() }
@@ -521,7 +1851,7 @@ func file_internal_model_proto_login_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_model_proto_login_proto_rawDesc), len(file_internal_model_proto_login_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   6,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

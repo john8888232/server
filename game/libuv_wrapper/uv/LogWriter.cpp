@@ -264,9 +264,14 @@ void uv::LogWriter::checkRotation()
     
     // Check file size
     if (currentFileSize_ >= config_.maxFileSize) {
-        // Create a new file with timestamp
+        // Create a new file with timestamp (only time part)
         std::string timestamp = getCurrentDateTime(false);
-        timestamp.replace(timestamp.find(' '), 1, "_");
+        // Extract only the time part after the space
+        size_t spacePos = timestamp.find(' ');
+        if (spacePos != std::string::npos) {
+            timestamp = timestamp.substr(spacePos + 1);
+        }
+        // Replace colons with dashes for filename compatibility
         timestamp.replace(timestamp.find(':'), 1, "-");
         timestamp.replace(timestamp.find(':'), 1, "-");
         

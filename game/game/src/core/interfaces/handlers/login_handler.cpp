@@ -11,7 +11,6 @@
 #include "core/infrastructure/common/app_context.h"
 #include "core/domain/models/game_manager.h"
 #include "core/domain/models/player_session.h"
-#include "core/domain/models/game_snapshot.h"
 #include "core/domain/models/user.h"
 #include "src/games/game_registry.h"
 #include <memory>
@@ -26,18 +25,10 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
     try {
         proto::LoginReq request;
         if (!request.ParseFromString(data)) {
-            std::string hexData;
-            for (size_t i = 0; i < data.size(); ++i) {
-                char hexChar[3];
-                sprintf(hexChar, "%02x", static_cast<unsigned char>(data[i]));
-                hexData += hexChar;
-            }
-            LOG_ERROR("Failed to parse login request from session %s, data(hex): %s", sessionId.c_str(), hexData.c_str());
-            
+            LOG_ERROR("Failed to parse login request from session %s", sessionId.c_str());
             proto::LoginResp response;
             response.set_code(ErrorCode::INVALID_REQUEST);
             response.set_message(ErrorCode::getErrorMessage(ErrorCode::INVALID_REQUEST));
-            
             std::string responseData;
             if (response.SerializeToString(&responseData)) {
                 responseCallback_(sessionId, Protocol::SC_LOGIN_RES, responseData);
@@ -45,8 +36,7 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
             return;
         }
         
-        LOG_INFO("Processing login request from %s (session: %s)", 
-                 request.loginname().c_str(), sessionId.c_str());
+        LOG_INFO("Processing login request from %s (session: %s)", request.loginname().c_str(), sessionId.c_str());
         
         proto::LoginResp response;
         response.set_loginname(request.loginname());
@@ -102,7 +92,7 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
                      request.loginname().c_str(), finalUser->getBalance());
         } else {
             // 即使使用游戏中的 User 对象，仍需验证 token
-        auto loginResult = userService_->processLogin(request, sessionId);
+            auto loginResult = userService_->processLogin(request, sessionId);
             if (!loginResult.success) {
                 response.set_code(loginResult.errorCode);
                 response.set_message(loginResult.errorMessage);
@@ -120,23 +110,23 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
         }
         
         // 构建成功响应
-            response.set_code(ErrorCode::SUCCESS);
-            response.set_message(ErrorCode::getErrorMessage(ErrorCode::SUCCESS));
-            auto playerInfo = response.mutable_info();
+        response.set_code(ErrorCode::SUCCESS);
+        response.set_message(ErrorCode::getErrorMessage(ErrorCode::SUCCESS));
+        auto playerInfo = response.mutable_info();
         playerInfo->set_username(finalUser->getLoginName());
         playerInfo->set_nickname(finalUser->getNickName());
         playerInfo->set_avatar(finalUser->getAvatar());
         playerInfo->set_balance(finalUser->getBalance()); // 使用游戏中的余额或数据库余额
         playerInfo->set_currency(finalUser->getCurrency());
             
-            bool completed = tcpServer_->getConnectionManager()->completePlayerSession(
+        bool completed = tcpServer_->getConnectionManager()->completePlayerSession(
             sessionId, request.loginname(), finalUser);
             
-            if (!completed) {
-                LOG_ERROR("Failed to complete player session after successful authentication");
+        if (!completed) {
+            LOG_ERROR("Failed to complete player session after successful authentication");
                 response.set_code(ErrorCode::SYSTEM_ERROR);
                 response.set_message("Failed to complete player session");
-            } else {
+        } else {
             // 只有在使用数据库数据时才更新登录信息
             if (!userFromGame) {
                 userService_->updateLastLogin(request.loginname(), request.client_ip());
@@ -193,7 +183,16 @@ bool LoginHandler::handlePlayerAuthenticated(const std::string& playerSessionId,
             auto gameManager = AppContext::getInstance().getGameManager();
             auto currentGame = gameManager->getPlayerGame(loginname);
             if (currentGame) {
+                // 重连逻辑：直接恢复到当前游戏
+                LOG_INFO("Player %s reconnecting to existing game %s", 
+                         loginname.c_str(), currentGame->roundID().c_str());
+                
+                // 更新GameManager映射关系
+                gameManager->addPlayerToGame(playerSession, currentGame);
+                
+                // 重新激活玩家到当前游戏
                 currentGame->addPlayer(playerSession);
+                
                 sendGameSnapshot(playerSessionId, currentGame);
                 LOG_INFO("Player %s successfully reconnected to game %s", 
                          loginname.c_str(), currentGame->gameType().c_str());
@@ -248,7 +247,12 @@ bool LoginHandler::handlePlayerAuthenticated(const std::string& playerSessionId,
                                  newGame->roundID().c_str(), gameType.c_str(), loginname.c_str());
                     }
                     if (targetGame) {
+                        // 更新GameManager映射关系
                         gameManager->addPlayerToGame(playerSession, targetGame);
+                        
+                        // 添加玩家到目标游戏
+                        targetGame->addPlayer(playerSession);
+                        
                         sendGameSnapshot(playerSessionId, targetGame);
                         LOG_INFO("Player %s successfully joined game %s of type %s", 
                                  loginname.c_str(), targetGame->roundID().c_str(), gameType.c_str());

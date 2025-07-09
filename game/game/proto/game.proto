@@ -110,7 +110,7 @@ message MinesPlaceBetRes {
 
 // 0x20003 - 设置自动兑现请求
 message MinesAutoCashReq {
-  string loginname = 1;     // 玩家登录名
+  string loginname = 1;      // 玩家登录名
   string roundId = 2;
   int32 playType = 3;        // 兑现玩法 1-左边 2-右边
   int32 enable = 4;          // 是否启用自动兑现 0-不启用 1-启用

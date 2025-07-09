@@ -42,7 +42,7 @@ public:
     // 玩家离开游戏
     bool removePlayerFromGame(const std::string& loginname);
 
-    // 获取玩家当前游戏
+    // 获取玩家当前所在的游戏
     std::shared_ptr<IGame> getPlayerGame(const std::string& loginname);
 
     // 获取所有游戏

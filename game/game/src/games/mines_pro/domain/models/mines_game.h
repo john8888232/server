@@ -100,6 +100,9 @@ public:
     // 清理inactive玩家
     void cleanupInactivePlayers();
     
+    // 重写父类方法：处理玩家断线
+    void handlePlayerDisconnect(const std::string& loginname) override;
+    
 private:
     // 游戏网格
     std::shared_ptr<MinesGrid> grid_;
@@ -127,10 +130,13 @@ private:
     proto::GameRankInfoNotify rankInfoNotify_;
     std::unordered_map<std::string, int> playerPlayTypeToRankIndex_;  // "loginname_playtype" -> index in rankInfoNotify_.players()
     
-    // 线程安全：使用继承自IGame的gameMutex_，保护游戏状态、玩家列表和榜单数据
     
-    static constexpr int WAIT_DURATION = 3;          // 写完数据库后等待 3秒,给前端的动画时间
-    static constexpr int AUTO_REVEAL_INTERVAL = 1;   // 自动翻牌间隔 1秒
+    mutable std::shared_mutex rankMutex_;           // 保护rankInfoNotify_, playerPlayTypeToRankIndex_
+    mutable std::shared_mutex gridMutex_;           // 保护grid_相关操作
+    
+    static constexpr int WAIT_DURATION = 3;           // 写完数据库后等待 3秒,给前端的动画时间
+    static constexpr int AUTO_REVEAL_INTERVAL = 1;    // 自动翻牌间隔 1秒
+    static constexpr int MAX_RANK_DISPLAY_COUNT = 50; // 榜单最大显示数量
     
     // 内部方法
     void initializeMinesGrid();
