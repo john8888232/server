@@ -18,9 +18,10 @@ message PlayerInfo {
   string username = 1;       // 玩家名
   string nickname = 2;       // 玩家昵称
   string avatar = 3;         // 玩家头像
-  int32 vip = 4;            // vip等级
+  int32 vip = 4;             // vip等级
   double balance = 5;        // 玩家余额
   string currency = 6;       // 币种
+  string loginname = 7;      // 登录名（用于数据库操作）
 }
 
 // 玩家的游戏快照信息

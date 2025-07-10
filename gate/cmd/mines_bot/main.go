@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"gate/proto"
@@ -19,9 +20,18 @@ const (
 	retryDelay = 100 * time.Millisecond
 )
 
+// BotMode 机器人模式
+type BotMode int
+
+const (
+	ModeBetAndCash BotMode = iota // 下注和兑现模式
+	ModeCancelBet                 // 取消下注模式
+)
+
 // Player 玩家对象
 type Player struct {
 	Username    string
+	Loginname   string
 	Nickname    string
 	Avatar      string
 	VIP         int32
@@ -29,8 +39,9 @@ type Player struct {
 	Currency    string
 	SessionID   string
 	RoundID     string
-	GameStatus  int32 // 0-init 1-start jetton 2-stop jetton 3-settled
-	BetPlayType int32 // 记录下注的玩法类型，0表示未下注
+	GameStatus  int32   // 0-init 1-start jetton 2-stop jetton 3-settled
+	BetPlayType int32   // 记录下注的玩法类型，0表示未下注
+	Mode        BotMode // 机器人运行模式
 }
 
 // Pack 按照包头格式打包消息
@@ -67,8 +78,39 @@ func Unpack(data []byte) (uint32, string, []byte, error) {
 	return msgID, sessionID, payload, nil
 }
 
+// showUsage 显示使用说明
+func showUsage() {
+	fmt.Println("扫雷游戏机器人")
+	fmt.Println("")
+	fmt.Println("用法:")
+	fmt.Println("  mines_bot a    # 下注和兑现模式 (登录->下注->兑现)")
+	fmt.Println("  mines_bot b    # 取消下注模式 (登录->下注->取消下注)")
+	fmt.Println("")
+	fmt.Println("说明:")
+	fmt.Println("  模式a: 测试正常的下注和结算流程")
+	fmt.Println("  模式b: 测试下注后立即取消下注的流程")
+}
+
 func main() {
-	log.Println("=== 扫雷游戏机器人启动 ===")
+	// 检查命令行参数
+	if len(os.Args) != 2 {
+		showUsage()
+		os.Exit(1)
+	}
+
+	var mode BotMode
+	switch os.Args[1] {
+	case "a":
+		mode = ModeBetAndCash
+		log.Println("=== 扫雷游戏机器人启动 (下注和兑现模式) ===")
+	case "b":
+		mode = ModeCancelBet
+		log.Println("=== 扫雷游戏机器人启动 (取消下注模式) ===")
+	default:
+		log.Printf("错误: 未知的模式参数 '%s'", os.Args[1])
+		showUsage()
+		os.Exit(1)
+	}
 
 	// 连接到WebSocket服务器
 	conn, _, err := websocket.DefaultDialer.Dial(serverAddr, nil)
@@ -80,7 +122,9 @@ func main() {
 	log.Println("成功连接到服务器")
 
 	// 创建玩家对象
-	player := &Player{}
+	player := &Player{
+		Mode: mode,
+	}
 
 	// 发送登录请求
 	if err := loginToGame(conn, player); err != nil {
@@ -115,6 +159,7 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 	}
 
 	msgData := Pack(0x11001, "", data)
+	log.Printf("📤 发送消息: MsgID=0x11001 (登录请求), 数据长度=%d", len(data))
 	err = conn.WriteMessage(websocket.BinaryMessage, msgData)
 	if err != nil {
 		return fmt.Errorf("发送登录请求失败: %v", err)
@@ -131,6 +176,8 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 	if err != nil {
 		return fmt.Errorf("解包登录响应失败: %v", err)
 	}
+
+	log.Printf("📥 收到消息: MsgID=0x%X, SessionID=%s, 数据长度=%d", msgID, sessionID, len(payload))
 
 	if msgID != 0x11002 {
 		return fmt.Errorf("收到意外的消息ID: 0x%X, 期望: 0x11002", msgID)
@@ -153,6 +200,7 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 	// 初始化玩家对象
 	if loginResp.Info != nil {
 		player.Username = loginResp.Info.Username
+		player.Loginname = loginResp.Info.Loginname
 		player.Nickname = loginResp.Info.Nickname
 		player.Avatar = loginResp.Info.Avatar
 		player.VIP = loginResp.Info.Vip
@@ -162,6 +210,7 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 
 		log.Println("玩家信息初始化完成:")
 		log.Printf("  用户名: %s", player.Username)
+		log.Printf("  登录名: %s", player.Loginname)
 		log.Printf("  昵称: %s", player.Nickname)
 		log.Printf("  头像: %s", player.Avatar)
 		log.Printf("  VIP等级: %d", player.VIP)
@@ -215,6 +264,11 @@ func handleMessages(conn *websocket.Conn, player *Player) {
 			continue
 		}
 
+		// 打印所有收到的消息（除了心跳响应）
+		if msgID != 0x11000 {
+			log.Printf("📥 收到消息: MsgID=0x%X, SessionID=%s, 数据长度=%d", msgID, sessionID, len(payload))
+		}
+
 		// 处理不同类型的消息
 		switch msgID {
 		case 0x11000: // 心跳响应 - 不打印
@@ -234,10 +288,13 @@ func handleMessages(conn *websocket.Conn, player *Player) {
 			handleStopJettonNotify(conn, payload, player)
 
 		case 0x20002: // 下注响应
-			handlePlaceBetResponse(payload, player)
+			handlePlaceBetResponse(conn, payload, player)
 
 		case 0x20006: // 兑现响应
 			handleCashResponse(payload, player)
+
+		case 0x20008: // 取消下注响应
+			handleCancelBetResponse(payload, player)
 
 		case 0x2000E: // 榜单信息通知
 			handleRankInfoNotify(payload)
@@ -281,6 +338,26 @@ func triggerBetting(conn *websocket.Conn, player *Player, reason string) {
 			log.Printf("记录下注玩法类型: %d", playType)
 		} else {
 			log.Printf("下注请求最终失败: 类型=%d, 金额=%.2f", playType, amount)
+		}
+	}()
+}
+
+// triggerCancelBet 触发取消下注逻辑
+func triggerCancelBet(conn *websocket.Conn, player *Player, reason string) {
+	if player.BetPlayType == 0 {
+		log.Printf("未下注，无需取消")
+		return
+	}
+
+	log.Printf("触发取消下注 (%s): 类型=%d", reason, player.BetPlayType)
+
+	// 延迟一段时间后取消下注，确保下注已经完成
+	go func() {
+		time.Sleep(1 * time.Second)
+
+		success := sendCancelBetWithRetry(conn, player, player.BetPlayType)
+		if !success {
+			log.Printf("取消下注请求最终失败: 类型=%d", player.BetPlayType)
 		}
 	}()
 }
@@ -332,6 +409,7 @@ func handleStartJettonNotify(conn *websocket.Conn, payload []byte, player *Playe
 	log.Printf("回合ID: %s", startNotify.RoundId)
 	log.Printf("游戏类型: %s", startNotify.Gametype)
 	log.Printf("下注持续时间: %d秒", startNotify.Duration)
+	log.Printf("机器人模式: %v", player.Mode)
 	log.Println("================================================")
 
 	// 更新回合ID
@@ -345,7 +423,7 @@ func handleStartJettonNotify(conn *websocket.Conn, payload []byte, player *Playe
 // sendPlaceBetWithRetry 带重试机制的下注请求
 func sendPlaceBetWithRetry(conn *websocket.Conn, player *Player, playType int32, amount float64) bool {
 	placeBetReq := &proto.MinesPlaceBetReq{
-		Loginname: player.Username,
+		Loginname: player.Loginname,
 		RoundId:   player.RoundID,
 		PlayType:  playType,
 		Amount:    amount,
@@ -361,6 +439,7 @@ func sendPlaceBetWithRetry(conn *websocket.Conn, player *Player, playType int32,
 		}
 
 		msgData := Pack(0x20001, player.SessionID, data)
+		log.Printf("📤 发送消息: MsgID=0x20001 (下注请求), 数据长度=%d", len(data))
 		err = conn.WriteMessage(websocket.BinaryMessage, msgData)
 		if err != nil {
 			log.Printf("发送下注请求失败 (尝试 %d/%d): %v", attempt, maxRetries, err)
@@ -372,6 +451,42 @@ func sendPlaceBetWithRetry(conn *websocket.Conn, player *Player, playType int32,
 		}
 
 		log.Printf("下注请求发送成功 (尝试 %d/%d)", attempt, maxRetries)
+		return true
+	}
+
+	return false
+}
+
+// sendCancelBetWithRetry 带重试机制的取消下注请求
+func sendCancelBetWithRetry(conn *websocket.Conn, player *Player, playType int32) bool {
+	cancelBetReq := &proto.MinesCancelBetReq{
+		Loginname: player.Loginname,
+		RoundId:   player.RoundID,
+		PlayType:  playType,
+	}
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		log.Printf("发送取消下注请求 (尝试 %d/%d): 类型=%d", attempt, maxRetries, playType)
+
+		data, err := protobuf.Marshal(cancelBetReq)
+		if err != nil {
+			log.Printf("序列化取消下注请求失败: %v", err)
+			return false
+		}
+
+		msgData := Pack(0x20007, player.SessionID, data)
+		log.Printf("📤 发送消息: MsgID=0x20007 (取消下注请求), 数据长度=%d", len(data))
+		err = conn.WriteMessage(websocket.BinaryMessage, msgData)
+		if err != nil {
+			log.Printf("发送取消下注请求失败 (尝试 %d/%d): %v", attempt, maxRetries, err)
+			if attempt < maxRetries {
+				time.Sleep(retryDelay * time.Duration(attempt))
+				continue
+			}
+			return false
+		}
+
+		log.Printf("取消下注请求发送成功 (尝试 %d/%d)", attempt, maxRetries)
 		return true
 	}
 
@@ -390,30 +505,41 @@ func handleStopJettonNotify(conn *websocket.Conn, payload []byte, player *Player
 	log.Printf("回合ID: %s", stopNotify.RoundId)
 	log.Printf("游戏类型: %s", stopNotify.GameType)
 	log.Printf("停止时间戳: %d", stopNotify.StopTime)
+	log.Printf("机器人模式: %v", player.Mode)
 	log.Println("================================================")
 
-	// 检查是否已下注，只对已下注的玩法进行兑现
-	if player.BetPlayType == 0 {
-		log.Printf("本轮未下注，跳过兑现")
-		return
-	}
-
-	// 使用重试机制发送兑现请求，使用与下注相同的玩法类型
-	go func() {
-		// 延迟一小段时间再兑现，避免与游戏逻辑冲突
-		time.Sleep(300 * time.Millisecond)
-
-		success := sendCashWithRetry(conn, player, player.BetPlayType)
-		if !success {
-			log.Printf("兑现请求最终失败: 类型=%d", player.BetPlayType)
+	// 根据模式决定操作
+	switch player.Mode {
+	case ModeBetAndCash:
+		// 下注和兑现模式：检查是否已下注，进行兑现
+		if player.BetPlayType == 0 {
+			log.Printf("本轮未下注，跳过兑现")
+			return
 		}
-	}()
+
+		// 使用重试机制发送兑现请求，使用与下注相同的玩法类型
+		go func() {
+			// 延迟一小段时间再兑现，避免与游戏逻辑冲突
+			time.Sleep(300 * time.Millisecond)
+
+			success := sendCashWithRetry(conn, player, player.BetPlayType)
+			if !success {
+				log.Printf("兑现请求最终失败: 类型=%d", player.BetPlayType)
+			}
+		}()
+
+	case ModeCancelBet:
+		// 取消下注模式：如果已下注，则取消下注
+		if player.BetPlayType != 0 {
+			triggerCancelBet(conn, player, "停止下注阶段")
+		}
+	}
 }
 
 // sendCashWithRetry 带重试机制的兑现请求
 func sendCashWithRetry(conn *websocket.Conn, player *Player, playType int32) bool {
 	cashReq := &proto.MinesCashReq{
-		Loginname: player.Username,
+		Loginname: player.Loginname,
 		RoundId:   player.RoundID,
 		PlayType:  playType,
 	}
@@ -428,6 +554,7 @@ func sendCashWithRetry(conn *websocket.Conn, player *Player, playType int32) boo
 		}
 
 		msgData := Pack(0x20005, player.SessionID, data)
+		log.Printf("📤 发送消息: MsgID=0x20005 (兑现请求), 数据长度=%d", len(data))
 		err = conn.WriteMessage(websocket.BinaryMessage, msgData)
 		if err != nil {
 			log.Printf("发送兑现请求失败 (尝试 %d/%d): %v", attempt, maxRetries, err)
@@ -446,7 +573,7 @@ func sendCashWithRetry(conn *websocket.Conn, player *Player, playType int32) boo
 }
 
 // handlePlaceBetResponse 处理下注响应
-func handlePlaceBetResponse(payload []byte, player *Player) {
+func handlePlaceBetResponse(conn *websocket.Conn, payload []byte, player *Player) {
 	var betResp proto.MinesPlaceBetRes
 	if err := protobuf.Unmarshal(payload, &betResp); err != nil {
 		log.Printf("反序列化下注响应失败: %v", err)
@@ -473,6 +600,40 @@ func handlePlaceBetResponse(payload []byte, player *Player) {
 		log.Printf("✅ 下注成功")
 		// 更新玩家余额
 		player.Balance = betResp.Balance
+
+		// 如果是取消下注模式，在下注成功后触发取消下注
+		if player.Mode == ModeCancelBet {
+			triggerCancelBet(conn, player, "下注成功后")
+		}
+	}
+	log.Println("================================================")
+}
+
+// handleCancelBetResponse 处理取消下注响应
+func handleCancelBetResponse(payload []byte, player *Player) {
+	var cancelResp proto.MinesCancelBetRes
+	if err := protobuf.Unmarshal(payload, &cancelResp); err != nil {
+		log.Printf("反序列化取消下注响应失败: %v", err)
+		return
+	}
+
+	log.Printf("==================== 取消下注响应 ====================")
+	log.Printf("回合ID: %s", cancelResp.RoundId)
+	log.Printf("响应码: %d", cancelResp.Code)
+	log.Printf("响应消息: %s", cancelResp.Message)
+	log.Printf("退还金额: %.2f", cancelResp.RefundAmount)
+	log.Printf("取消后余额: %.2f", cancelResp.Balance)
+	log.Printf("下注类型: %d", cancelResp.PlayType)
+
+	// 检查取消下注结果
+	if cancelResp.Code != 0 {
+		log.Printf("⚠️  取消下注失败 - 错误码: %d, 消息: %s", cancelResp.Code, cancelResp.Message)
+	} else {
+		log.Printf("✅ 取消下注成功，退还金额: %.2f", cancelResp.RefundAmount)
+		// 更新玩家余额
+		player.Balance = cancelResp.Balance
+		// 重置下注状态
+		player.BetPlayType = 0
 	}
 	log.Println("================================================")
 }

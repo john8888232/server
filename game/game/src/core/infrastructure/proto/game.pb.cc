@@ -56,6 +56,7 @@ PROTOBUF_CONSTEXPR PlayerInfo::PlayerInfo(
   , /*decltype(_impl_.nickname_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.avatar_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.currency_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.loginname_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.balance_)*/0
   , /*decltype(_impl_.vip_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
@@ -430,6 +431,7 @@ const uint32_t TableStruct_game_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.vip_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.balance_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.currency_),
+  PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.loginname_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfoSnap, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -637,27 +639,27 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 0, -1, -1, sizeof(::proto::BetRecord)},
   { 8, -1, -1, sizeof(::proto::ReckonRecord)},
   { 17, -1, -1, sizeof(::proto::PlayerInfo)},
-  { 29, -1, -1, sizeof(::proto::PlayerInfoSnap)},
-  { 38, -1, -1, sizeof(::proto::GameResult)},
-  { 47, -1, -1, sizeof(::proto::HeartBeat)},
-  { 54, -1, -1, sizeof(::proto::LoginReq)},
-  { 65, -1, -1, sizeof(::proto::LoginResp)},
-  { 75, -1, -1, sizeof(::proto::LogoutReq)},
-  { 82, -1, -1, sizeof(::proto::LogoutRes)},
-  { 91, -1, -1, sizeof(::proto::KickPlayerNotify)},
-  { 99, -1, -1, sizeof(::proto::GameSnapshotNotify)},
-  { 112, -1, -1, sizeof(::proto::MinesPlaceBetReq)},
-  { 122, -1, -1, sizeof(::proto::MinesPlaceBetRes)},
-  { 133, -1, -1, sizeof(::proto::MinesAutoCashReq)},
-  { 144, -1, -1, sizeof(::proto::MinesAutoCashRes)},
-  { 156, -1, -1, sizeof(::proto::MinesCashReq)},
-  { 165, -1, -1, sizeof(::proto::MinesCashRes)},
-  { 177, -1, -1, sizeof(::proto::MinesCancelBetReq)},
-  { 186, -1, -1, sizeof(::proto::MinesCancelBetRes)},
-  { 198, -1, -1, sizeof(::proto::MinesStartJettonNotify)},
-  { 207, -1, -1, sizeof(::proto::GameStopJettonNotify)},
-  { 216, -1, -1, sizeof(::proto::GameRankInfoNotify)},
-  { 225, -1, -1, sizeof(::proto::ConnClose)},
+  { 30, -1, -1, sizeof(::proto::PlayerInfoSnap)},
+  { 39, -1, -1, sizeof(::proto::GameResult)},
+  { 48, -1, -1, sizeof(::proto::HeartBeat)},
+  { 55, -1, -1, sizeof(::proto::LoginReq)},
+  { 66, -1, -1, sizeof(::proto::LoginResp)},
+  { 76, -1, -1, sizeof(::proto::LogoutReq)},
+  { 83, -1, -1, sizeof(::proto::LogoutRes)},
+  { 92, -1, -1, sizeof(::proto::KickPlayerNotify)},
+  { 100, -1, -1, sizeof(::proto::GameSnapshotNotify)},
+  { 113, -1, -1, sizeof(::proto::MinesPlaceBetReq)},
+  { 123, -1, -1, sizeof(::proto::MinesPlaceBetRes)},
+  { 134, -1, -1, sizeof(::proto::MinesAutoCashReq)},
+  { 145, -1, -1, sizeof(::proto::MinesAutoCashRes)},
+  { 157, -1, -1, sizeof(::proto::MinesCashReq)},
+  { 166, -1, -1, sizeof(::proto::MinesCashRes)},
+  { 178, -1, -1, sizeof(::proto::MinesCancelBetReq)},
+  { 187, -1, -1, sizeof(::proto::MinesCancelBetRes)},
+  { 199, -1, -1, sizeof(::proto::MinesStartJettonNotify)},
+  { 208, -1, -1, sizeof(::proto::GameStopJettonNotify)},
+  { 217, -1, -1, sizeof(::proto::GameRankInfoNotify)},
+  { 226, -1, -1, sizeof(::proto::ConnClose)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -691,59 +693,60 @@ const char descriptor_table_protodef_game_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "\n\ngame.proto\022\005proto\"-\n\tBetRecord\022\020\n\010play"
   "Type\030\001 \001(\005\022\016\n\006amount\030\002 \001(\001\"\?\n\014ReckonReco"
   "rd\022\020\n\010playType\030\001 \001(\005\022\016\n\006amount\030\002 \001(\001\022\r\n\005"
-  "multi\030\003 \001(\001\"p\n\nPlayerInfo\022\020\n\010username\030\001 "
-  "\001(\t\022\020\n\010nickname\030\002 \001(\t\022\016\n\006avatar\030\003 \001(\t\022\013\n"
-  "\003vip\030\004 \001(\005\022\017\n\007balance\030\005 \001(\001\022\020\n\010currency\030"
-  "\006 \001(\t\"w\n\016PlayerInfoSnap\022\037\n\004info\030\001 \001(\0132\021."
-  "proto.PlayerInfo\022\036\n\004bets\030\002 \003(\0132\020.proto.B"
-  "etRecord\022$\n\007reckons\030\003 \003(\0132\023.proto.Reckon"
-  "Record\":\n\nGameResult\022\016\n\006result\030\001 \001(\005\022\r\n\005"
-  "multi\030\002 \001(\001\022\r\n\005index\030\003 \001(\005\"\036\n\tHeartBeat\022"
-  "\021\n\ttimestamp\030\001 \001(\003\"c\n\010LoginReq\022\021\n\tloginn"
-  "ame\030\001 \001(\t\022\r\n\005token\030\002 \001(\t\022\021\n\tgame_type\030\003 "
-  "\001(\t\022\017\n\007version\030\004 \001(\r\022\021\n\tclient_ip\030\005 \001(\t\""
-  "^\n\tLoginResp\022\021\n\tloginname\030\001 \001(\t\022\014\n\004code\030"
-  "\002 \001(\005\022\017\n\007message\030\003 \001(\t\022\037\n\004info\030\004 \001(\0132\021.p"
-  "roto.PlayerInfo\"\036\n\tLogoutReq\022\021\n\tloginnam"
-  "e\030\001 \001(\t\"9\n\tLogoutRes\022\021\n\tloginname\030\001 \001(\t\022"
-  "\014\n\004code\030\002 \001(\005\022\013\n\003msg\030\003 \001(\t\"5\n\020KickPlayer"
-  "Notify\022\021\n\tsessionId\030\001 \001(\t\022\016\n\006reason\030\002 \001("
-  "\005\"\242\001\n\022GameSnapshotNotify\022\017\n\007roundId\030\001 \001("
-  "\t\022\020\n\010gameType\030\002 \001(\t\022\016\n\006status\030\003 \001(\005\022\022\n\nr"
-  "emainTime\030\004 \001(\003\022\020\n\010curIndex\030\005 \001(\005\022\020\n\010cur"
-  "Multi\030\006 \001(\001\022!\n\006result\030\007 \003(\0132\021.proto.Game"
-  "Result\"X\n\020MinesPlaceBetReq\022\021\n\tloginname\030"
-  "\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010playType\030\003 \001(\005"
-  "\022\016\n\006amount\030\004 \001(\001\"r\n\020MinesPlaceBetRes\022\014\n\004"
-  "code\030\001 \001(\005\022\017\n\007message\030\002 \001(\t\022\017\n\007roundId\030\003"
-  " \001(\t\022\035\n\003bet\030\004 \001(\0132\020.proto.BetRecord\022\017\n\007b"
-  "alance\030\005 \001(\001\"f\n\020MinesAutoCashReq\022\021\n\tlogi"
-  "nname\030\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010playType"
-  "\030\003 \001(\005\022\016\n\006enable\030\004 \001(\005\022\014\n\004grid\030\005 \001(\005\"r\n\020"
-  "MinesAutoCashRes\022\017\n\007roundId\030\001 \001(\t\022\014\n\004cod"
-  "e\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022\016\n\006enable\030\004 \001(\005"
-  "\022\014\n\004grid\030\005 \001(\005\022\020\n\010playType\030\006 \001(\005\"D\n\014Mine"
-  "sCashReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002"
-  " \001(\t\022\020\n\010playType\030\003 \001(\005\"\206\001\n\014MinesCashRes\022"
-  "\017\n\007roundId\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007messag"
-  "e\030\003 \001(\t\022#\n\006reckon\030\004 \001(\0132\023.proto.ReckonRe"
-  "cord\022\017\n\007balance\030\005 \001(\001\022\020\n\010playType\030\006 \001(\005\""
-  "I\n\021MinesCancelBetReq\022\021\n\tloginname\030\001 \001(\t\022"
-  "\017\n\007roundId\030\002 \001(\t\022\020\n\010playType\030\003 \001(\005\"|\n\021Mi"
-  "nesCancelBetRes\022\017\n\007roundId\030\001 \001(\t\022\014\n\004code"
-  "\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022\024\n\014refundAmount\030"
-  "\004 \001(\001\022\017\n\007balance\030\005 \001(\001\022\020\n\010playType\030\006 \001(\005"
-  "\"M\n\026MinesStartJettonNotify\022\017\n\007roundId\030\001 "
-  "\001(\t\022\020\n\010gametype\030\002 \001(\t\022\020\n\010duration\030\003 \001(\003\""
-  "K\n\024GameStopJettonNotify\022\017\n\007roundId\030\001 \001(\t"
-  "\022\020\n\010gameType\030\002 \001(\t\022\020\n\010stopTime\030\003 \001(\003\"_\n\022"
-  "GameRankInfoNotify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010g"
-  "ameType\030\002 \001(\t\022&\n\007players\030\003 \003(\0132\025.proto.P"
-  "layerInfoSnap\"\013\n\tConnCloseb\006proto3"
+  "multi\030\003 \001(\001\"\203\001\n\nPlayerInfo\022\020\n\010username\030\001"
+  " \001(\t\022\020\n\010nickname\030\002 \001(\t\022\016\n\006avatar\030\003 \001(\t\022\013"
+  "\n\003vip\030\004 \001(\005\022\017\n\007balance\030\005 \001(\001\022\020\n\010currency"
+  "\030\006 \001(\t\022\021\n\tloginname\030\007 \001(\t\"w\n\016PlayerInfoS"
+  "nap\022\037\n\004info\030\001 \001(\0132\021.proto.PlayerInfo\022\036\n\004"
+  "bets\030\002 \003(\0132\020.proto.BetRecord\022$\n\007reckons\030"
+  "\003 \003(\0132\023.proto.ReckonRecord\":\n\nGameResult"
+  "\022\016\n\006result\030\001 \001(\005\022\r\n\005multi\030\002 \001(\001\022\r\n\005index"
+  "\030\003 \001(\005\"\036\n\tHeartBeat\022\021\n\ttimestamp\030\001 \001(\003\"c"
+  "\n\010LoginReq\022\021\n\tloginname\030\001 \001(\t\022\r\n\005token\030\002"
+  " \001(\t\022\021\n\tgame_type\030\003 \001(\t\022\017\n\007version\030\004 \001(\r"
+  "\022\021\n\tclient_ip\030\005 \001(\t\"^\n\tLoginResp\022\021\n\tlogi"
+  "nname\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003 \001"
+  "(\t\022\037\n\004info\030\004 \001(\0132\021.proto.PlayerInfo\"\036\n\tL"
+  "ogoutReq\022\021\n\tloginname\030\001 \001(\t\"9\n\tLogoutRes"
+  "\022\021\n\tloginname\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\013\n\003msg"
+  "\030\003 \001(\t\"5\n\020KickPlayerNotify\022\021\n\tsessionId\030"
+  "\001 \001(\t\022\016\n\006reason\030\002 \001(\005\"\242\001\n\022GameSnapshotNo"
+  "tify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022"
+  "\016\n\006status\030\003 \001(\005\022\022\n\nremainTime\030\004 \001(\003\022\020\n\010c"
+  "urIndex\030\005 \001(\005\022\020\n\010curMulti\030\006 \001(\001\022!\n\006resul"
+  "t\030\007 \003(\0132\021.proto.GameResult\"X\n\020MinesPlace"
+  "BetReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002 \001"
+  "(\t\022\020\n\010playType\030\003 \001(\005\022\016\n\006amount\030\004 \001(\001\"r\n\020"
+  "MinesPlaceBetRes\022\014\n\004code\030\001 \001(\005\022\017\n\007messag"
+  "e\030\002 \001(\t\022\017\n\007roundId\030\003 \001(\t\022\035\n\003bet\030\004 \001(\0132\020."
+  "proto.BetRecord\022\017\n\007balance\030\005 \001(\001\"f\n\020Mine"
+  "sAutoCashReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007round"
+  "Id\030\002 \001(\t\022\020\n\010playType\030\003 \001(\005\022\016\n\006enable\030\004 \001"
+  "(\005\022\014\n\004grid\030\005 \001(\005\"r\n\020MinesAutoCashRes\022\017\n\007"
+  "roundId\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003"
+  " \001(\t\022\016\n\006enable\030\004 \001(\005\022\014\n\004grid\030\005 \001(\005\022\020\n\010pl"
+  "ayType\030\006 \001(\005\"D\n\014MinesCashReq\022\021\n\tloginnam"
+  "e\030\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010playType\030\003 \001"
+  "(\005\"\206\001\n\014MinesCashRes\022\017\n\007roundId\030\001 \001(\t\022\014\n\004"
+  "code\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022#\n\006reckon\030\004 "
+  "\001(\0132\023.proto.ReckonRecord\022\017\n\007balance\030\005 \001("
+  "\001\022\020\n\010playType\030\006 \001(\005\"I\n\021MinesCancelBetReq"
+  "\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010"
+  "playType\030\003 \001(\005\"|\n\021MinesCancelBetRes\022\017\n\007r"
+  "oundId\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003 "
+  "\001(\t\022\024\n\014refundAmount\030\004 \001(\001\022\017\n\007balance\030\005 \001"
+  "(\001\022\020\n\010playType\030\006 \001(\005\"M\n\026MinesStartJetton"
+  "Notify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gametype\030\002 \001("
+  "\t\022\020\n\010duration\030\003 \001(\003\"K\n\024GameStopJettonNot"
+  "ify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022\020"
+  "\n\010stopTime\030\003 \001(\003\"_\n\022GameRankInfoNotify\022\017"
+  "\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022&\n\007pla"
+  "yers\030\003 \003(\0132\025.proto.PlayerInfoSnap\"\013\n\tCon"
+  "nCloseb\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_game_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_game_2eproto = {
-    false, false, 2074, descriptor_table_protodef_game_2eproto,
+    false, false, 2094, descriptor_table_protodef_game_2eproto,
     "game.proto",
     &descriptor_table_game_2eproto_once, nullptr, 0, 24,
     schemas, file_default_instances, TableStruct_game_2eproto::offsets,
@@ -1260,6 +1263,7 @@ PlayerInfo::PlayerInfo(const PlayerInfo& from)
     , decltype(_impl_.nickname_){}
     , decltype(_impl_.avatar_){}
     , decltype(_impl_.currency_){}
+    , decltype(_impl_.loginname_){}
     , decltype(_impl_.balance_){}
     , decltype(_impl_.vip_){}
     , /*decltype(_impl_._cached_size_)*/{}};
@@ -1297,6 +1301,14 @@ PlayerInfo::PlayerInfo(const PlayerInfo& from)
     _this->_impl_.currency_.Set(from._internal_currency(), 
       _this->GetArenaForAllocation());
   }
+  _impl_.loginname_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.loginname_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_loginname().empty()) {
+    _this->_impl_.loginname_.Set(from._internal_loginname(), 
+      _this->GetArenaForAllocation());
+  }
   ::memcpy(&_impl_.balance_, &from._impl_.balance_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.vip_) -
     reinterpret_cast<char*>(&_impl_.balance_)) + sizeof(_impl_.vip_));
@@ -1312,6 +1324,7 @@ inline void PlayerInfo::SharedCtor(
     , decltype(_impl_.nickname_){}
     , decltype(_impl_.avatar_){}
     , decltype(_impl_.currency_){}
+    , decltype(_impl_.loginname_){}
     , decltype(_impl_.balance_){0}
     , decltype(_impl_.vip_){0}
     , /*decltype(_impl_._cached_size_)*/{}
@@ -1332,6 +1345,10 @@ inline void PlayerInfo::SharedCtor(
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.currency_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.loginname_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.loginname_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 PlayerInfo::~PlayerInfo() {
@@ -1349,6 +1366,7 @@ inline void PlayerInfo::SharedDtor() {
   _impl_.nickname_.Destroy();
   _impl_.avatar_.Destroy();
   _impl_.currency_.Destroy();
+  _impl_.loginname_.Destroy();
 }
 
 void PlayerInfo::SetCachedSize(int size) const {
@@ -1365,6 +1383,7 @@ void PlayerInfo::Clear() {
   _impl_.nickname_.ClearToEmpty();
   _impl_.avatar_.ClearToEmpty();
   _impl_.currency_.ClearToEmpty();
+  _impl_.loginname_.ClearToEmpty();
   ::memset(&_impl_.balance_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.vip_) -
       reinterpret_cast<char*>(&_impl_.balance_)) + sizeof(_impl_.vip_));
@@ -1430,6 +1449,16 @@ const char* PlayerInfo::_InternalParse(const char* ptr, ::_pbi::ParseContext* ct
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "proto.PlayerInfo.currency"));
+        } else
+          goto handle_unusual;
+        continue;
+      // string loginname = 7;
+      case 7:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 58)) {
+          auto str = _internal_mutable_loginname();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "proto.PlayerInfo.loginname"));
         } else
           goto handle_unusual;
         continue;
@@ -1518,6 +1547,16 @@ uint8_t* PlayerInfo::_InternalSerialize(
         6, this->_internal_currency(), target);
   }
 
+  // string loginname = 7;
+  if (!this->_internal_loginname().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_loginname().data(), static_cast<int>(this->_internal_loginname().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "proto.PlayerInfo.loginname");
+    target = stream->WriteStringMaybeAliased(
+        7, this->_internal_loginname(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -1560,6 +1599,13 @@ size_t PlayerInfo::ByteSizeLong() const {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_currency());
+  }
+
+  // string loginname = 7;
+  if (!this->_internal_loginname().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_loginname());
   }
 
   // double balance = 5;
@@ -1606,6 +1652,9 @@ void PlayerInfo::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PRO
   if (!from._internal_currency().empty()) {
     _this->_internal_set_currency(from._internal_currency());
   }
+  if (!from._internal_loginname().empty()) {
+    _this->_internal_set_loginname(from._internal_loginname());
+  }
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_balance = from._internal_balance();
   uint64_t raw_balance;
@@ -1650,6 +1699,10 @@ void PlayerInfo::InternalSwap(PlayerInfo* other) {
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.currency_, lhs_arena,
       &other->_impl_.currency_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.loginname_, lhs_arena,
+      &other->_impl_.loginname_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(PlayerInfo, _impl_.vip_)

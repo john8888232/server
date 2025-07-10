@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Gate项目编译脚本
-# 用于编译cmd目录下的各个Go程序到对应的bin目录
+# 用于编译cmd目录下的各个Go程序到对应的bin目录，以及编译proto文件
 
 set -e  # 遇到错误立即退出
 
@@ -40,6 +40,84 @@ check_go() {
         exit 1
     fi
     print_info "Go version: $(go version)"
+}
+
+# 检查protoc环境
+check_protoc() {
+    if ! command -v protoc &> /dev/null; then
+        print_error "protoc is not installed or not in PATH"
+        print_error "Please install Protocol Buffers compiler"
+        exit 1
+    fi
+    print_info "protoc version: $(protoc --version)"
+    
+    # 确保Go bin目录在PATH中
+    export PATH=$PATH:$(go env GOPATH)/bin
+    
+    # 检查protoc-gen-go插件
+    if ! command -v protoc-gen-go &> /dev/null; then
+        print_error "protoc-gen-go is not installed or not in PATH"
+        print_error "Please install it with: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"
+        exit 1
+    fi
+    print_info "protoc-gen-go found: $(which protoc-gen-go)"
+}
+
+# 编译proto文件
+build_proto() {
+    print_info "Building proto files..."
+    
+    # 检查protoc环境
+    check_protoc
+    
+    # 定义proto文件目录
+    local proto_src_dir="internal/model/proto"
+    local proto_output_dir="proto"
+    
+    # 创建输出目录
+    mkdir -p "$proto_output_dir"
+    
+    # 编译所有proto文件
+    local proto_files=("$proto_src_dir"/*.proto)
+    local success_count=0
+    local total_count=0
+    
+    # 计算实际的proto文件数量
+    for proto_file in "${proto_files[@]}"; do
+        if [[ -f "$proto_file" ]]; then
+            ((total_count++))
+        fi
+    done
+    
+    if [[ $total_count -eq 0 ]]; then
+        print_warning "No proto files found in $proto_src_dir"
+        return 0
+    fi
+    
+    for proto_file in "${proto_files[@]}"; do
+        if [[ -f "$proto_file" ]]; then
+            local filename=$(basename "$proto_file")
+            print_info "Compiling $filename..."
+            
+            # 使用protoc编译proto文件
+            if protoc --go_out="$proto_output_dir" --go_opt=paths=source_relative --proto_path="$proto_src_dir" "$proto_file"; then
+                print_success "Successfully compiled $filename"
+                ((success_count++))
+            else
+                print_error "Failed to compile $filename"
+            fi
+        fi
+    done
+    
+    print_info "Proto compilation summary: $success_count/$total_count files compiled"
+    
+    if [[ $success_count -eq $total_count ]]; then
+        print_success "All proto files compiled successfully!"
+        return 0
+    else
+        print_warning "Some proto files failed to compile."
+        return 1
+    fi
 }
 
 # 编译单个程序
@@ -91,13 +169,21 @@ build_program() {
 clean() {
     print_info "Cleaning binary files..."
     
-    for program in gameserver_stub gateway test; do
+    # 清理Go程序二进制文件
+    for program in gameserver_stub gateway test mines_bot; do
         local bin_file="cmd/$program/bin/$program"
         if [[ -f "$bin_file" ]]; then
             rm -f "$bin_file"
             print_info "Removed $bin_file"
         fi
     done
+    
+    # 清理proto生成的文件
+    if [[ -d "proto" ]]; then
+        print_info "Cleaning proto generated files..."
+        rm -rf proto/*.pb.go
+        print_info "Removed proto generated files"
+    fi
     
     print_success "Clean completed"
 }
@@ -112,16 +198,19 @@ show_help() {
     echo "  -h, --help     显示此帮助信息"
     echo "  -c, --clean    清理编译生成的二进制文件"
     echo "  -a, --all      编译所有程序 (默认行为)"
+    echo "  -p, --proto    只编译proto文件"
     echo ""
     echo "程序名:"
     echo "  gameserver_stub  编译游戏服务器存根"
     echo "  gateway          编译网关服务器"
     echo "  test            编译测试客户端"
+    echo "  mines_bot       编译mines机器人"
     echo ""
     echo "示例:"
-    echo "  $0                    # 编译所有程序"
+    echo "  $0                    # 编译所有程序和proto文件"
     echo "  $0 gateway            # 只编译gateway"
     echo "  $0 gateway test       # 编译gateway和test"
+    echo "  $0 --proto            # 只编译proto文件"
     echo "  $0 --clean            # 清理所有二进制文件"
 }
 
@@ -130,6 +219,7 @@ main() {
     local programs=()
     local clean_flag=false
     local build_all=true
+    local proto_only=false
     
     # 解析命令行参数
     while [[ $# -gt 0 ]]; do
@@ -146,7 +236,12 @@ main() {
                 build_all=true
                 shift
                 ;;
-            gameserver_stub|gateway|test)
+            -p|--proto)
+                proto_only=true
+                build_all=false
+                shift
+                ;;
+            gameserver_stub|gateway|test|mines_bot)
                 programs+=("$1")
                 build_all=false
                 shift
@@ -165,12 +260,25 @@ main() {
         return 0
     fi
     
+    # 只编译proto文件
+    if [[ "$proto_only" == true ]]; then
+        build_proto
+        return $?
+    fi
+    
     # 检查Go环境
     check_go
     
+    # 首先编译proto文件
+    print_info "Starting proto compilation..."
+    if ! build_proto; then
+        print_error "Proto compilation failed, aborting build process"
+        exit 1
+    fi
+    
     # 确定要编译的程序列表
     if [[ "$build_all" == true ]] || [[ ${#programs[@]} -eq 0 ]]; then
-        programs=("gameserver_stub" "gateway" "test")
+        programs=("gameserver_stub" "gateway" "test" "mines_bot")
     fi
     
     print_info "Starting build process..."
@@ -198,17 +306,8 @@ main() {
         exit 1
     fi
     
-    # 显示生成的文件
-    echo ""
-    print_info "Generated binaries:"
-    for program in "${programs[@]}"; do
-        local bin_file="cmd/$program/bin/$program"
-        if [[ -f "$bin_file" ]]; then
-            local file_size=$(du -h "$bin_file" | cut -f1)
-            echo "  $bin_file ($file_size)"
-        fi
-    done
+    print_success "Build process completed!"
 }
 
-# 运行主函数
+# 执行主函数
 main "$@"

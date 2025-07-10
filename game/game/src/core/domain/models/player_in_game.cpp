@@ -10,11 +10,10 @@ PlayerInGame::PlayerInGame(std::shared_ptr<User> user, std::weak_ptr<PlayerSessi
       playerSession_(session),
       joinTime_(std::chrono::system_clock::now()),
       active_(true),
-      betAmount_(0.0) {
+      isBet_(false) {
     if (user) {
         loginname_ = user->getLoginName();
     } else {
-        // 如果没有 User 对象，尝试从 PlayerSession 获取 loginname
         auto sessionPtr = session.lock();
         if (sessionPtr) {
             loginname_ = sessionPtr->getLoginname();
@@ -24,10 +23,9 @@ PlayerInGame::PlayerInGame(std::shared_ptr<User> user, std::weak_ptr<PlayerSessi
 
 void PlayerInGame::setSession(std::shared_ptr<PlayerSession> session) {
     std::lock_guard<std::mutex> lock(playerMutex_);
-    playerSession_ = session; // weak_ptr 可以直接从 shared_ptr 赋值
+    playerSession_ = session; 
     if (session) {
         active_ = true;
-        // 确保 loginname 一致
         if (loginname_.empty()) {
             loginname_ = session->getLoginname();
         }
@@ -61,23 +59,7 @@ void PlayerInGame::setBalance(double newBalance) {
     }
 }
 
-void PlayerInGame::addBetRecord(const BetRecord& record) {
-    std::lock_guard<std::mutex> lock(playerMutex_);
-    betRecords_.push_back(record);
-    LOG_INFO("Added BetRecord for player %s, type: %s, amount: %.2f", 
-             loginname_.c_str(), record.getPlayType().c_str(), record.getAmount());
-}
-
-std::vector<BetRecord> PlayerInGame::getBetRecords() const {
-    std::lock_guard<std::mutex> lock(playerMutex_);
-    return std::vector<BetRecord>(betRecords_.begin(), betRecords_.end());
-}
-
-void PlayerInGame::clearBetRecords() {
-    std::lock_guard<std::mutex> lock(playerMutex_);
-    betRecords_.clear();
-    LOG_INFO("Cleared all bet records for player %s", loginname_.c_str());
-}
+// betRecords_ 相关方法已移除 - 实际下注记录存储在游戏排行榜中
 
 // 自动兑现相关方法实现
 void PlayerInGame::setAutoCashConfig(int32_t playType, bool enable, int32_t targetGrid) {

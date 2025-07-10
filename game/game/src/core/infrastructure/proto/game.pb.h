@@ -603,6 +603,7 @@ class PlayerInfo final :
     kNicknameFieldNumber = 2,
     kAvatarFieldNumber = 3,
     kCurrencyFieldNumber = 6,
+    kLoginnameFieldNumber = 7,
     kBalanceFieldNumber = 5,
     kVipFieldNumber = 4,
   };
@@ -662,6 +663,20 @@ class PlayerInfo final :
   std::string* _internal_mutable_currency();
   public:
 
+  // string loginname = 7;
+  void clear_loginname();
+  const std::string& loginname() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_loginname(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_loginname();
+  PROTOBUF_NODISCARD std::string* release_loginname();
+  void set_allocated_loginname(std::string* loginname);
+  private:
+  const std::string& _internal_loginname() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_loginname(const std::string& value);
+  std::string* _internal_mutable_loginname();
+  public:
+
   // double balance = 5;
   void clear_balance();
   double balance() const;
@@ -692,6 +707,7 @@ class PlayerInfo final :
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr nickname_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr avatar_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr currency_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr loginname_;
     double balance_;
     int32_t vip_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -4992,6 +5008,56 @@ inline void PlayerInfo::set_allocated_currency(std::string* currency) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:proto.PlayerInfo.currency)
+}
+
+// string loginname = 7;
+inline void PlayerInfo::clear_loginname() {
+  _impl_.loginname_.ClearToEmpty();
+}
+inline const std::string& PlayerInfo::loginname() const {
+  // @@protoc_insertion_point(field_get:proto.PlayerInfo.loginname)
+  return _internal_loginname();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void PlayerInfo::set_loginname(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.loginname_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:proto.PlayerInfo.loginname)
+}
+inline std::string* PlayerInfo::mutable_loginname() {
+  std::string* _s = _internal_mutable_loginname();
+  // @@protoc_insertion_point(field_mutable:proto.PlayerInfo.loginname)
+  return _s;
+}
+inline const std::string& PlayerInfo::_internal_loginname() const {
+  return _impl_.loginname_.Get();
+}
+inline void PlayerInfo::_internal_set_loginname(const std::string& value) {
+  
+  _impl_.loginname_.Set(value, GetArenaForAllocation());
+}
+inline std::string* PlayerInfo::_internal_mutable_loginname() {
+  
+  return _impl_.loginname_.Mutable(GetArenaForAllocation());
+}
+inline std::string* PlayerInfo::release_loginname() {
+  // @@protoc_insertion_point(field_release:proto.PlayerInfo.loginname)
+  return _impl_.loginname_.Release();
+}
+inline void PlayerInfo::set_allocated_loginname(std::string* loginname) {
+  if (loginname != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.loginname_.SetAllocated(loginname, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.loginname_.IsDefault()) {
+    _impl_.loginname_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:proto.PlayerInfo.loginname)
 }
 
 // -------------------------------------------------------------------

@@ -121,15 +121,17 @@ bool LogoutHandler::canPlayerLogout(const std::string& loginname) {
             return true;
         }
 
-        auto betRecords = playerInGame->getBetRecords();
-        if (betRecords.empty()) {
+        // 检查玩家是否有下注（使用isBet_字段判断）
+        bool hasAnyBets = playerInGame->hasBet();
+        
+        if (!hasAnyBets) {
             LOG_DEBUG("Player %s has no bets, allowing logout", loginname.c_str());
             return true;
         }
 
         // 有下注且游戏在进行中，不允许退出
-        LOG_INFO("Player %s has %d bet(s) in active game (status: %d), denying logout", 
-                 loginname.c_str(), (int)betRecords.size(), (int)gameStatus );
+        LOG_INFO("Player %s has bets in active game (status: %d), denying logout", 
+                 loginname.c_str(), (int)gameStatus );
         return false;
 
     } catch (const std::exception& e) {

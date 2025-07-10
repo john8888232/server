@@ -19,6 +19,7 @@ public:
     User(int64_t playerId, 
          int avatarId, 
          const std::string& loginName,
+         const std::string& username,
          const std::string& nickName,
          double amount,
          int vipLevel,
@@ -29,6 +30,7 @@ public:
     int64_t getPlayerId() const { return playerId_; }
     int getAvatarId() const { return avatarId_; }
     const std::string& getLoginName() const { return loginName_; }
+    const std::string& getUserName() const { return username_; }
     const std::string& getNickName() const { return nickName_; }
     double getBalance() const { return amount_; }
     int getVipLevel() const { return vipLevel_; }
@@ -46,6 +48,7 @@ private:
     int64_t playerId_;
     int avatarId_;
     std::string loginName_;
+    std::string username_;
     std::string nickName_;
     double amount_;
     int vipLevel_;

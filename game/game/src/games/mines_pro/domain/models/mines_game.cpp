@@ -333,15 +333,24 @@ void MinesGame::writeGameResultToDatabase() {
         
         std::vector<std::string> playerData;
         {
-            std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-            for (const auto& playerPair : players_) {
-                const auto& playerInGame = playerPair.second;
-                auto user = playerInGame->getUser();
-                if (!user) continue;
+            std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
+            // 遍历排行榜中的所有玩家，收集下注和派奖记录
+            for (int i = 0; i < roundPlayerRecord_.players_size(); ++i) {
+                const auto& player = roundPlayerRecord_.players(i);
+                const auto& playerInfo = player.info();
                 
-                const auto& betRecords = playerInGame->getBetRecords();
-                for (const auto& bet : betRecords) {
-                    // TODO: 构造下注记录的JSON格式
+                // 处理下注记录
+                for (const auto& bet : player.bets()) {
+                    // TODO: 构造下注记录的JSON格式并写入数据库
+                    LOG_DEBUG("Player %s bet: playType=%d, amount=%.2f", 
+                             playerInfo.loginname().c_str(), bet.playtype(), bet.amount());
+                }
+                
+                // 处理派奖记录
+                for (const auto& reckon : player.reckons()) {
+                    // TODO: 构造派奖记录的JSON格式并写入数据库
+                    LOG_DEBUG("Player %s reckon: playType=%d, amount=%.2f, multi=%.2f", 
+                             playerInfo.loginname().c_str(), reckon.playtype(), reckon.amount(), reckon.multi());
                 }
             }
         }
@@ -556,12 +565,12 @@ void MinesGame::onConfigUpdated(const json& newConfig) {
     LOG_INFO("MinesGame config update completed");
 }
 
-// 榜单相关方法实现 - 简化版本
+
 void MinesGame::initializeRankInfo() {
-    rankInfoNotify_.Clear();
-    rankInfoNotify_.set_roundid(roundID_);
-    rankInfoNotify_.set_gametype(gameType_);
-    playerPlayTypeToRankIndex_.clear();
+    roundPlayerRecord_.Clear();
+    roundPlayerRecord_.set_roundid(roundID_);
+    roundPlayerRecord_.set_gametype(gameType_);
+    roundPlayerRecordIndex_.clear();
     LOG_DEBUG("Initialized rank info for game %s", roundID_.c_str());
 }
 
@@ -571,12 +580,12 @@ void MinesGame::updatePlayerBet(const std::string& loginname, const proto::Playe
     
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(betRecord.playtype());
-    auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
     proto::PlayerInfoSnap* playerSnap = nullptr;
     
-    if (indexIt == playerPlayTypeToRankIndex_.end()) {
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         // 新的(玩家,玩法)组合，添加到榜单
-        playerSnap = rankInfoNotify_.add_players();
+        playerSnap = roundPlayerRecord_.add_players();
         *playerSnap->mutable_info() = playerInfo;
         
         // 添加单个玩法的下注记录
@@ -584,10 +593,10 @@ void MinesGame::updatePlayerBet(const std::string& loginname, const proto::Playe
         bet->set_playtype(betRecord.playtype());
         bet->set_amount(betRecord.amount());
         
-        playerPlayTypeToRankIndex_[playerPlayTypeKey] = rankInfoNotify_.players_size() - 1;
+        roundPlayerRecordIndex_[playerPlayTypeKey] = roundPlayerRecord_.players_size() - 1;
     } else {
         // 现有(玩家,玩法)组合，更新信息
-        playerSnap = rankInfoNotify_.mutable_players(indexIt->second);
+        playerSnap = roundPlayerRecord_.mutable_players(indexIt->second);
         *playerSnap->mutable_info() = playerInfo;  // 更新玩家基本信息（如余额）
     
         // 累计相同玩法的下注金额
@@ -609,14 +618,14 @@ void MinesGame::updatePlayerCash(const std::string& loginname, const proto::Reck
     
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(reckonRecord.playtype());
-    auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
-    if (indexIt == playerPlayTypeToRankIndex_.end()) {
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         LOG_WARN("Player loginname %s playType %d not found in rank data for cash update", 
                  loginname.c_str(), reckonRecord.playtype());
         return;
     }
     
-    auto playerSnap = rankInfoNotify_.mutable_players(indexIt->second);
+    auto playerSnap = roundPlayerRecord_.mutable_players(indexIt->second);
     
     // 添加兑奖记录
     auto& reckons = *playerSnap->mutable_reckons();
@@ -633,8 +642,8 @@ void MinesGame::sortRankByBetAmount() {
     // 创建索引和下注金额的映射
     std::vector<std::pair<double, int>> betAmountIndex;
     
-    for (int i = 0; i < rankInfoNotify_.players_size(); ++i) {
-        const auto& player = rankInfoNotify_.players(i);
+    for (int i = 0; i < roundPlayerRecord_.players_size(); ++i) {
+        const auto& player = roundPlayerRecord_.players(i);
         double betAmount = 0.0;
         
         // 每个玩家只有一个玩法的下注记录
@@ -653,41 +662,35 @@ void MinesGame::sortRankByBetAmount() {
     
     // 创建新的排序后的玩家列表
     proto::GameRankInfoNotify sortedNotify;
-    sortedNotify.set_roundid(rankInfoNotify_.roundid());
-    sortedNotify.set_gametype(rankInfoNotify_.gametype());
+    sortedNotify.set_roundid(roundPlayerRecord_.roundid());
+    sortedNotify.set_gametype(roundPlayerRecord_.gametype());
     
     // 创建反向映射：oldIndex -> playerPlayTypeKey
     std::unordered_map<int, std::string> oldIndexToPlayerPlayTypeKey;
-    for (const auto& playerPlayTypePair : playerPlayTypeToRankIndex_) {
+    for (const auto& playerPlayTypePair : roundPlayerRecordIndex_) {
         oldIndexToPlayerPlayTypeKey[playerPlayTypePair.second] = playerPlayTypePair.first;
     }
     
     // 重建playerPlayTypeToRankIndex映射
-    playerPlayTypeToRankIndex_.clear();
+    roundPlayerRecordIndex_.clear();
     
     for (size_t newIndex = 0; newIndex < betAmountIndex.size(); ++newIndex) {
         int oldIndex = betAmountIndex[newIndex].second;
         auto playerSnap = sortedNotify.add_players();
-        *playerSnap = rankInfoNotify_.players(oldIndex);
+        *playerSnap = roundPlayerRecord_.players(oldIndex);
         
         // 更新映射
         auto playerPlayTypeIt = oldIndexToPlayerPlayTypeKey.find(oldIndex);
         if (playerPlayTypeIt != oldIndexToPlayerPlayTypeKey.end()) {
-            playerPlayTypeToRankIndex_[playerPlayTypeIt->second] = newIndex;
+            roundPlayerRecordIndex_[playerPlayTypeIt->second] = newIndex;
         }
     }
     
     // 替换原有的榜单数据
-    rankInfoNotify_ = std::move(sortedNotify);
+    roundPlayerRecord_ = std::move(sortedNotify);
     
     LOG_DEBUG("Sorted rank by bet amount for game %s, %d entries", 
-              roundID_.c_str(), rankInfoNotify_.players_size());
-}
-
-void MinesGame::clearRankInfo() {
-    rankInfoNotify_.Clear();
-    playerPlayTypeToRankIndex_.clear();
-    LOG_DEBUG("Cleared rank info for game %s", roundID_.c_str());
+              roundID_.c_str(), roundPlayerRecord_.players_size());
 }
 
 proto::GameRankInfoNotify MinesGame::getRankInfoNotify() const {
@@ -695,16 +698,16 @@ proto::GameRankInfoNotify MinesGame::getRankInfoNotify() const {
     
     // 创建限制为前50个的副本
     proto::GameRankInfoNotify rankInfoCopy;
-    rankInfoCopy.set_roundid(rankInfoNotify_.roundid());
-    rankInfoCopy.set_gametype(rankInfoNotify_.gametype());
+    rankInfoCopy.set_roundid(roundPlayerRecord_.roundid());
+    rankInfoCopy.set_gametype(roundPlayerRecord_.gametype());
     
     // 限制玩家数量为前50个
-    int playerCount = rankInfoNotify_.players_size();
+    int playerCount = roundPlayerRecord_.players_size();
     int maxPlayers = std::min(playerCount, MAX_RANK_DISPLAY_COUNT);
     
     for (int i = 0; i < maxPlayers; ++i) {
         auto* newPlayer = rankInfoCopy.add_players();
-        *newPlayer = rankInfoNotify_.players(i);
+        *newPlayer = roundPlayerRecord_.players(i);
     }
     
     return rankInfoCopy;  // 返回限制后的副本，线程安全
@@ -722,16 +725,16 @@ void MinesGame::broadcastRankInfo() {
         std::shared_lock<std::shared_mutex> lock(rankMutex_);
         
         // 复制基本信息
-        rankInfoCopy.set_roundid(rankInfoNotify_.roundid());
-        rankInfoCopy.set_gametype(rankInfoNotify_.gametype());
+        rankInfoCopy.set_roundid(roundPlayerRecord_.roundid());
+        rankInfoCopy.set_gametype(roundPlayerRecord_.gametype());
         
         // 限制玩家数量为前50个
-        int playerCount = rankInfoNotify_.players_size();
+        int playerCount = roundPlayerRecord_.players_size();
         int maxPlayers = std::min(playerCount, MAX_RANK_DISPLAY_COUNT);
         
         for (int i = 0; i < maxPlayers; ++i) {
             auto* newPlayer = rankInfoCopy.add_players();
-            *newPlayer = rankInfoNotify_.players(i);
+            *newPlayer = roundPlayerRecord_.players(i);
         }
         
         LOG_DEBUG("Prepared rank info for broadcast: %d/%d players (limited to %d)", 
@@ -1024,21 +1027,21 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
     
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
-    auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
-    if (indexIt == playerPlayTypeToRankIndex_.end()) {
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player not found in rank data");
         return false;
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= rankInfoNotify_.players_size()) {
+    if (playerIndex >= roundPlayerRecord_.players_size()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player index out of range");
         return false;
     }
     
-    auto* player = rankInfoNotify_.mutable_players(playerIndex);
+    auto* player = roundPlayerRecord_.mutable_players(playerIndex);
     
     // 检查是否已经兑现过
     for (const auto& reckon : player->reckons()) {
@@ -1169,21 +1172,21 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
     
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
-    auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
-    if (indexIt == playerPlayTypeToRankIndex_.end()) {
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player not found in rank data");
         return false;
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= rankInfoNotify_.players_size()) {
+    if (playerIndex >= roundPlayerRecord_.players_size()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player index out of range");
         return false;
     }
     
-    auto* player = rankInfoNotify_.mutable_players(playerIndex);
+    auto* player = roundPlayerRecord_.mutable_players(playerIndex);
     
     // 计算退款金额
     double totalRefund = 0.0;
@@ -1206,6 +1209,9 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
     
     // 使用updatePlayerCancelBet方法更新退款记录
     updatePlayerCancelBet(loginname, playType, totalRefund);
+    
+    // 设置玩家下注状态为false（取消下注后）
+    playerInGame->setBetStatus(false);
     
     // 设置成功响应
     response.set_code(0);
@@ -1300,7 +1306,8 @@ bool MinesGame::processPlaceBet(const std::string& loginname, const std::string&
     
     // 9. 创建玩家信息
     proto::PlayerInfo playerInfo;
-    playerInfo.set_username(loginname);
+    playerInfo.set_loginname(loginname);  // 设置登录名用于数据库操作
+    playerInfo.set_username(user->getUserName()); 
     playerInfo.set_nickname(user->getNickName());
     playerInfo.set_avatar(user->getAvatar());
     playerInfo.set_vip(user->getVipLevel());
@@ -1317,7 +1324,10 @@ bool MinesGame::processPlaceBet(const std::string& loginname, const std::string&
     // 11. 更新游戏榜单信息
     updatePlayerBet(loginname, playerInfo, betRecord);
     
-    // 12. 设置成功响应
+    // 12. 设置玩家下注状态
+    playerInGame->setBetStatus(true);
+    
+    // 13. 设置成功响应
     response.set_code(0);
     response.set_message("Bet placed successfully");
     response.set_balance(newBalance);
@@ -1392,45 +1402,45 @@ void MinesGame::cleanupInactivePlayers() {
 }
 
 void MinesGame::rebuildPlayerPlayTypeToRankMapping() {
-    playerPlayTypeToRankIndex_.clear();
+    roundPlayerRecordIndex_.clear();
     
     // 遍历榜单中的每个条目，重建(玩家,玩法)到索引的映射
-    for (int i = 0; i < rankInfoNotify_.players_size(); ++i) {
-        const auto& player = rankInfoNotify_.players(i);
-        const std::string& loginname = player.info().username();
+    for (int i = 0; i < roundPlayerRecord_.players_size(); ++i) {
+        const auto& player = roundPlayerRecord_.players(i);
+        const std::string& loginname = player.info().loginname();
         
         if (!loginname.empty() && player.bets_size() > 0) {
             int32_t playType = player.bets(0).playtype();
             std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
-            playerPlayTypeToRankIndex_[playerPlayTypeKey] = i;
+            roundPlayerRecordIndex_[playerPlayTypeKey] = i;
             LOG_DEBUG("Rebuilt mapping: %s -> index %d", playerPlayTypeKey.c_str(), i);
         }
     }
     
     LOG_DEBUG("Rebuilt playerPlayType to rank mapping for game %s, %d entries", 
-              roundID_.c_str(), (int)playerPlayTypeToRankIndex_.size());
+              roundID_.c_str(), (int)roundPlayerRecordIndex_.size());
 }
 
 void MinesGame::updatePlayerCancelBet(const std::string& loginname, int32_t playType, double refundAmount) {
     // 此方法应在rankMutex_锁保护下调用
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
-    auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
-    if (indexIt == playerPlayTypeToRankIndex_.end()) {
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         LOG_WARN("Player loginname %s playType %d not found in rank data for cancel bet", 
                  loginname.c_str(), playType);
         return;
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= rankInfoNotify_.players_size()) {
+    if (playerIndex >= roundPlayerRecord_.players_size()) {
         LOG_ERROR("Player index %d out of range for cancel bet", playerIndex);
         return;
     }
     
     // 直接从榜单中移除这个(玩家,玩法)条目
-    rankInfoNotify_.mutable_players()->erase(
-        rankInfoNotify_.mutable_players()->begin() + playerIndex);
+    roundPlayerRecord_.mutable_players()->erase(
+        roundPlayerRecord_.mutable_players()->begin() + playerIndex);
     
     // 重建映射
     rebuildPlayerPlayTypeToRankMapping();
@@ -1620,10 +1630,11 @@ void MinesGame::resetAllPlayersCashOutStatus() {
         const auto& playerInGame = playerPair.second;
         if (playerInGame) {
             playerInGame->resetCashOutStatus();
+            playerInGame->resetBetStatus();  // 同时重置下注状态
         }
     }
     
-    LOG_INFO("Reset cash out status for all players in game %s", roundID_.c_str());
+    LOG_INFO("Reset cash out and bet status for all players in game %s", roundID_.c_str());
 }
 
 bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t playType) {
@@ -1654,19 +1665,19 @@ bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t pla
     
     // 查找榜单条目
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
-    auto indexIt = playerPlayTypeToRankIndex_.find(playerPlayTypeKey);
-    if (indexIt == playerPlayTypeToRankIndex_.end()) {
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         LOG_ERROR("Player %s playType %d not found in rank data", loginname.c_str(), playType);
         return false;
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= rankInfoNotify_.players_size()) {
+    if (playerIndex >= roundPlayerRecord_.players_size()) {
         LOG_ERROR("Player index %d out of range", playerIndex);
         return false;
     }
     
-    auto* player = rankInfoNotify_.mutable_players(playerIndex);
+    auto* player = roundPlayerRecord_.mutable_players(playerIndex);
     
     // 检查是否已经兑现过（榜单检查）
     for (const auto& reckon : player->reckons()) {
@@ -1740,15 +1751,22 @@ void MinesGame::handlePlayerDisconnect(const std::string& loginname) {
     // 检查是否需要执行断线兑现
     if (currentStatus == GameStatus::STOP_JETTON && playerInGame) {
         // 检查玩家是否有需要立即兑现的玩法
-        for (int32_t playType = 1; playType <= 2; ++playType) {
+        for (int32_t playType = MinesProPlayType::LEFT; playType <= MinesProPlayType::RIGHT; ++playType) {
             if (!playerInGame->getAutoCashEnabled(playType) && !playerInGame->hasCashedOut(playType)) {
                 // 检查是否有该玩法的下注
-                auto betRecords = playerInGame->getBetRecords();
+                std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
                 bool hasPlayTypeBet = false;
-                for (const auto& bet : betRecords) {
-                    if (std::stoi(bet.getPlayType()) == playType) {
-                        hasPlayTypeBet = true;
-                        break;
+                {
+                    std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
+                    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+                    if (indexIt != roundPlayerRecordIndex_.end()) {
+                        int playerIndex = indexIt->second;
+                        if (playerIndex < roundPlayerRecord_.players_size()) {
+                            const auto& player = roundPlayerRecord_.players(playerIndex);
+                            if (player.bets_size() > 0 && player.bets(0).playtype() == playType) {
+                                hasPlayTypeBet = true;
+                            }
+                        }
                     }
                 }
                 

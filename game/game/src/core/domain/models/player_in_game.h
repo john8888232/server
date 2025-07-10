@@ -8,7 +8,7 @@
 #include <vector>
 #include <mutex>
 #include <unordered_map>
-#include "bet_record.h"
+// bet_record.h 不再需要 - 下注记录存储在游戏排行榜中
 
 // 前向声明，避免循环引用
 class PlayerSession;
@@ -53,26 +53,16 @@ public:
     // 设置玩家余额 - 更新游戏状态中的 User 对象
     void setBalance(double newBalance);
     
-    // 获取玩家当前下注金额
-    double getBetAmount() const { return betAmount_; }
+    // 检查玩家是否已下注
+    bool hasBet() const { return isBet_; }
     
-    // 设置玩家当前下注金额
-    void setBetAmount(double amount) { betAmount_ = amount; }
+    // 设置玩家下注状态
+    void setBetStatus(bool hasBet) { isBet_ = hasBet; }
     
-    // 添加下注金额
-    void addBet(double amount) { betAmount_ += amount; }
+    // 重置下注状态（每局开始时调用）
+    void resetBetStatus() { isBet_ = false; }
     
-    // 重置下注
-    void resetBet() { betAmount_ = 0; }
-    
-    // 添加下注记录
-    void addBetRecord(const BetRecord& record);
-    
-    // 获取所有下注记录
-    std::vector<BetRecord> getBetRecords() const;
-    
-    // 清除所有下注记录
-    void clearBetRecords();
+    // 下注记录相关方法已移除 - 实际下注记录存储在游戏排行榜中
     
     // 设置自动兑现配置
     void setAutoCashConfig(int32_t playType, bool enable, int32_t targetGrid);
@@ -95,8 +85,8 @@ private:
     std::weak_ptr<PlayerSession> playerSession_;     // 指向玩家会话的指针（用于通信，离线后自动失效）
     std::chrono::system_clock::time_point joinTime_; // 游戏时间
     bool active_;                                    // 玩家是否活跃
-    double betAmount_;                               // 当前下注总金额
-    std::list<BetRecord> betRecords_;                // 下注记录
+    bool isBet_;                                     // 玩家是否已下注
+    // betRecords_ 已移除 - 实际下注记录存储在游戏排行榜中
     
     // 自动兑现相关字段
     struct AutoCashConfig {

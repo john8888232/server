@@ -113,7 +113,8 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
         response.set_code(ErrorCode::SUCCESS);
         response.set_message(ErrorCode::getErrorMessage(ErrorCode::SUCCESS));
         auto playerInfo = response.mutable_info();
-        playerInfo->set_username(finalUser->getLoginName());
+        playerInfo->set_username(finalUser->getUserName());
+        playerInfo->set_loginname(finalUser->getLoginName());  // 设置登录名
         playerInfo->set_nickname(finalUser->getNickName());
         playerInfo->set_avatar(finalUser->getAvatar());
         playerInfo->set_balance(finalUser->getBalance()); // 使用游戏中的余额或数据库余额

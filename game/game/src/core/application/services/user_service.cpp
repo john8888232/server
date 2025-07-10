@@ -95,7 +95,7 @@ UserService::LoginResult UserService::processLogin(const proto::LoginReq& reques
         
         // 创建用户对象
         User::Status userStatus = static_cast<User::Status>(playerStatus);
-        result.user = std::make_shared<User>(playerId, avatarId, loginName, nickName, 
+        result.user = std::make_shared<User>(playerId, avatarId, loginName, username, nickName, 
                                             amount, vipLevel, currency, userStatus);
         
         auto success = updateLastLogin(loginName, request.client_ip());

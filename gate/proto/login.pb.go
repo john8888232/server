@@ -2,7 +2,7 @@
 // versions:
 // 	protoc-gen-go v1.36.6
 // 	protoc        v3.21.0
-// source: internal/model/proto/login.proto
+// source: login.proto
 
 package proto
 
@@ -57,11 +57,11 @@ func (x KickPlayerNotifyErrtype) String() string {
 }
 
 func (KickPlayerNotifyErrtype) Descriptor() protoreflect.EnumDescriptor {
-	return file_internal_model_proto_login_proto_enumTypes[0].Descriptor()
+	return file_login_proto_enumTypes[0].Descriptor()
 }
 
 func (KickPlayerNotifyErrtype) Type() protoreflect.EnumType {
-	return &file_internal_model_proto_login_proto_enumTypes[0]
+	return &file_login_proto_enumTypes[0]
 }
 
 func (x KickPlayerNotifyErrtype) Number() protoreflect.EnumNumber {
@@ -70,7 +70,7 @@ func (x KickPlayerNotifyErrtype) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use KickPlayerNotifyErrtype.Descriptor instead.
 func (KickPlayerNotifyErrtype) EnumDescriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{11, 0}
+	return file_login_proto_rawDescGZIP(), []int{11, 0}
 }
 
 type BetRecord struct {
@@ -83,7 +83,7 @@ type BetRecord struct {
 
 func (x *BetRecord) Reset() {
 	*x = BetRecord{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[0]
+	mi := &file_login_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -95,7 +95,7 @@ func (x *BetRecord) String() string {
 func (*BetRecord) ProtoMessage() {}
 
 func (x *BetRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[0]
+	mi := &file_login_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -108,7 +108,7 @@ func (x *BetRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BetRecord.ProtoReflect.Descriptor instead.
 func (*BetRecord) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{0}
+	return file_login_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *BetRecord) GetPlayType() int32 {
@@ -136,7 +136,7 @@ type ReckonRecord struct {
 
 func (x *ReckonRecord) Reset() {
 	*x = ReckonRecord{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[1]
+	mi := &file_login_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -148,7 +148,7 @@ func (x *ReckonRecord) String() string {
 func (*ReckonRecord) ProtoMessage() {}
 
 func (x *ReckonRecord) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[1]
+	mi := &file_login_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -161,7 +161,7 @@ func (x *ReckonRecord) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReckonRecord.ProtoReflect.Descriptor instead.
 func (*ReckonRecord) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{1}
+	return file_login_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *ReckonRecord) GetPlayType() int32 {
@@ -187,19 +187,20 @@ func (x *ReckonRecord) GetMulti() float64 {
 
 type PlayerInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"` // 玩家名
-	Nickname      string                 `protobuf:"bytes,2,opt,name=nickname,proto3" json:"nickname,omitempty"` // 玩家昵称
-	Avatar        string                 `protobuf:"bytes,3,opt,name=avatar,proto3" json:"avatar,omitempty"`     // 玩家头像
-	Vip           int32                  `protobuf:"varint,4,opt,name=vip,proto3" json:"vip,omitempty"`          // vip等级
-	Balance       float64                `protobuf:"fixed64,5,opt,name=balance,proto3" json:"balance,omitempty"` // 玩家余额
-	Currency      string                 `protobuf:"bytes,6,opt,name=currency,proto3" json:"currency,omitempty"` // 币种
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`   // 玩家名
+	Nickname      string                 `protobuf:"bytes,2,opt,name=nickname,proto3" json:"nickname,omitempty"`   // 玩家昵称
+	Avatar        string                 `protobuf:"bytes,3,opt,name=avatar,proto3" json:"avatar,omitempty"`       // 玩家头像
+	Vip           int32                  `protobuf:"varint,4,opt,name=vip,proto3" json:"vip,omitempty"`            // vip等级
+	Balance       float64                `protobuf:"fixed64,5,opt,name=balance,proto3" json:"balance,omitempty"`   // 玩家余额
+	Currency      string                 `protobuf:"bytes,6,opt,name=currency,proto3" json:"currency,omitempty"`   // 币种
+	Loginname     string                 `protobuf:"bytes,7,opt,name=loginname,proto3" json:"loginname,omitempty"` // 登录名（用于数据库操作）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PlayerInfo) Reset() {
 	*x = PlayerInfo{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[2]
+	mi := &file_login_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -211,7 +212,7 @@ func (x *PlayerInfo) String() string {
 func (*PlayerInfo) ProtoMessage() {}
 
 func (x *PlayerInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[2]
+	mi := &file_login_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -224,7 +225,7 @@ func (x *PlayerInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerInfo.ProtoReflect.Descriptor instead.
 func (*PlayerInfo) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{2}
+	return file_login_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *PlayerInfo) GetUsername() string {
@@ -269,6 +270,13 @@ func (x *PlayerInfo) GetCurrency() string {
 	return ""
 }
 
+func (x *PlayerInfo) GetLoginname() string {
+	if x != nil {
+		return x.Loginname
+	}
+	return ""
+}
+
 // 玩家的游戏快照信息
 type PlayerInfoSnap struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -281,7 +289,7 @@ type PlayerInfoSnap struct {
 
 func (x *PlayerInfoSnap) Reset() {
 	*x = PlayerInfoSnap{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[3]
+	mi := &file_login_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -293,7 +301,7 @@ func (x *PlayerInfoSnap) String() string {
 func (*PlayerInfoSnap) ProtoMessage() {}
 
 func (x *PlayerInfoSnap) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[3]
+	mi := &file_login_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -306,7 +314,7 @@ func (x *PlayerInfoSnap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlayerInfoSnap.ProtoReflect.Descriptor instead.
 func (*PlayerInfoSnap) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{3}
+	return file_login_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *PlayerInfoSnap) GetInfo() *PlayerInfo {
@@ -341,7 +349,7 @@ type GameResult struct {
 
 func (x *GameResult) Reset() {
 	*x = GameResult{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[4]
+	mi := &file_login_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -353,7 +361,7 @@ func (x *GameResult) String() string {
 func (*GameResult) ProtoMessage() {}
 
 func (x *GameResult) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[4]
+	mi := &file_login_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -366,7 +374,7 @@ func (x *GameResult) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameResult.ProtoReflect.Descriptor instead.
 func (*GameResult) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{4}
+	return file_login_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GameResult) GetResult() int32 {
@@ -400,7 +408,7 @@ type HeartBeat struct {
 
 func (x *HeartBeat) Reset() {
 	*x = HeartBeat{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[5]
+	mi := &file_login_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -412,7 +420,7 @@ func (x *HeartBeat) String() string {
 func (*HeartBeat) ProtoMessage() {}
 
 func (x *HeartBeat) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[5]
+	mi := &file_login_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -425,7 +433,7 @@ func (x *HeartBeat) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartBeat.ProtoReflect.Descriptor instead.
 func (*HeartBeat) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{5}
+	return file_login_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *HeartBeat) GetTimestamp() int64 {
@@ -449,7 +457,7 @@ type LoginReq struct {
 
 func (x *LoginReq) Reset() {
 	*x = LoginReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[6]
+	mi := &file_login_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -461,7 +469,7 @@ func (x *LoginReq) String() string {
 func (*LoginReq) ProtoMessage() {}
 
 func (x *LoginReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[6]
+	mi := &file_login_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +482,7 @@ func (x *LoginReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginReq.ProtoReflect.Descriptor instead.
 func (*LoginReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{6}
+	return file_login_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *LoginReq) GetLoginname() string {
@@ -525,7 +533,7 @@ type LoginResp struct {
 
 func (x *LoginResp) Reset() {
 	*x = LoginResp{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[7]
+	mi := &file_login_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -537,7 +545,7 @@ func (x *LoginResp) String() string {
 func (*LoginResp) ProtoMessage() {}
 
 func (x *LoginResp) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[7]
+	mi := &file_login_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -550,7 +558,7 @@ func (x *LoginResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginResp.ProtoReflect.Descriptor instead.
 func (*LoginResp) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{7}
+	return file_login_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *LoginResp) GetLoginname() string {
@@ -591,7 +599,7 @@ type LogoutReq struct {
 
 func (x *LogoutReq) Reset() {
 	*x = LogoutReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[8]
+	mi := &file_login_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +611,7 @@ func (x *LogoutReq) String() string {
 func (*LogoutReq) ProtoMessage() {}
 
 func (x *LogoutReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[8]
+	mi := &file_login_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +624,7 @@ func (x *LogoutReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutReq.ProtoReflect.Descriptor instead.
 func (*LogoutReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{8}
+	return file_login_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *LogoutReq) GetLoginname() string {
@@ -638,7 +646,7 @@ type LogoutRes struct {
 
 func (x *LogoutRes) Reset() {
 	*x = LogoutRes{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[9]
+	mi := &file_login_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -650,7 +658,7 @@ func (x *LogoutRes) String() string {
 func (*LogoutRes) ProtoMessage() {}
 
 func (x *LogoutRes) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[9]
+	mi := &file_login_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -663,7 +671,7 @@ func (x *LogoutRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutRes.ProtoReflect.Descriptor instead.
 func (*LogoutRes) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{9}
+	return file_login_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *LogoutRes) GetLoginname() string {
@@ -696,7 +704,7 @@ type ConnClose struct {
 
 func (x *ConnClose) Reset() {
 	*x = ConnClose{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[10]
+	mi := &file_login_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -708,7 +716,7 @@ func (x *ConnClose) String() string {
 func (*ConnClose) ProtoMessage() {}
 
 func (x *ConnClose) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[10]
+	mi := &file_login_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -721,7 +729,7 @@ func (x *ConnClose) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnClose.ProtoReflect.Descriptor instead.
 func (*ConnClose) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{10}
+	return file_login_proto_rawDescGZIP(), []int{10}
 }
 
 // 0x11006 - 踢出玩家通知
@@ -736,7 +744,7 @@ type KickPlayerNotify struct {
 
 func (x *KickPlayerNotify) Reset() {
 	*x = KickPlayerNotify{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[11]
+	mi := &file_login_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -748,7 +756,7 @@ func (x *KickPlayerNotify) String() string {
 func (*KickPlayerNotify) ProtoMessage() {}
 
 func (x *KickPlayerNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[11]
+	mi := &file_login_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -761,7 +769,7 @@ func (x *KickPlayerNotify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KickPlayerNotify.ProtoReflect.Descriptor instead.
 func (*KickPlayerNotify) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{11}
+	return file_login_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *KickPlayerNotify) GetSessionId() string {
@@ -794,7 +802,7 @@ type GameSnapshotNotify struct {
 
 func (x *GameSnapshotNotify) Reset() {
 	*x = GameSnapshotNotify{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[12]
+	mi := &file_login_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -806,7 +814,7 @@ func (x *GameSnapshotNotify) String() string {
 func (*GameSnapshotNotify) ProtoMessage() {}
 
 func (x *GameSnapshotNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[12]
+	mi := &file_login_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -819,7 +827,7 @@ func (x *GameSnapshotNotify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameSnapshotNotify.ProtoReflect.Descriptor instead.
 func (*GameSnapshotNotify) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{12}
+	return file_login_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GameSnapshotNotify) GetRoundId() string {
@@ -884,7 +892,7 @@ type MinesPlaceBetReq struct {
 
 func (x *MinesPlaceBetReq) Reset() {
 	*x = MinesPlaceBetReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[13]
+	mi := &file_login_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -896,7 +904,7 @@ func (x *MinesPlaceBetReq) String() string {
 func (*MinesPlaceBetReq) ProtoMessage() {}
 
 func (x *MinesPlaceBetReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[13]
+	mi := &file_login_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -909,7 +917,7 @@ func (x *MinesPlaceBetReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesPlaceBetReq.ProtoReflect.Descriptor instead.
 func (*MinesPlaceBetReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{13}
+	return file_login_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *MinesPlaceBetReq) GetLoginname() string {
@@ -954,7 +962,7 @@ type MinesPlaceBetRes struct {
 
 func (x *MinesPlaceBetRes) Reset() {
 	*x = MinesPlaceBetRes{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[14]
+	mi := &file_login_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -966,7 +974,7 @@ func (x *MinesPlaceBetRes) String() string {
 func (*MinesPlaceBetRes) ProtoMessage() {}
 
 func (x *MinesPlaceBetRes) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[14]
+	mi := &file_login_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -979,7 +987,7 @@ func (x *MinesPlaceBetRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesPlaceBetRes.ProtoReflect.Descriptor instead.
 func (*MinesPlaceBetRes) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{14}
+	return file_login_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *MinesPlaceBetRes) GetCode() int32 {
@@ -1031,7 +1039,7 @@ type MinesAutoCashReq struct {
 
 func (x *MinesAutoCashReq) Reset() {
 	*x = MinesAutoCashReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[15]
+	mi := &file_login_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1043,7 +1051,7 @@ func (x *MinesAutoCashReq) String() string {
 func (*MinesAutoCashReq) ProtoMessage() {}
 
 func (x *MinesAutoCashReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[15]
+	mi := &file_login_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1056,7 +1064,7 @@ func (x *MinesAutoCashReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesAutoCashReq.ProtoReflect.Descriptor instead.
 func (*MinesAutoCashReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{15}
+	return file_login_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *MinesAutoCashReq) GetLoginname() string {
@@ -1109,7 +1117,7 @@ type MinesAutoCashRes struct {
 
 func (x *MinesAutoCashRes) Reset() {
 	*x = MinesAutoCashRes{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[16]
+	mi := &file_login_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1121,7 +1129,7 @@ func (x *MinesAutoCashRes) String() string {
 func (*MinesAutoCashRes) ProtoMessage() {}
 
 func (x *MinesAutoCashRes) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[16]
+	mi := &file_login_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1134,7 +1142,7 @@ func (x *MinesAutoCashRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesAutoCashRes.ProtoReflect.Descriptor instead.
 func (*MinesAutoCashRes) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{16}
+	return file_login_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *MinesAutoCashRes) GetRoundId() string {
@@ -1191,7 +1199,7 @@ type MinesCashReq struct {
 
 func (x *MinesCashReq) Reset() {
 	*x = MinesCashReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[17]
+	mi := &file_login_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1203,7 +1211,7 @@ func (x *MinesCashReq) String() string {
 func (*MinesCashReq) ProtoMessage() {}
 
 func (x *MinesCashReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[17]
+	mi := &file_login_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1216,7 +1224,7 @@ func (x *MinesCashReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesCashReq.ProtoReflect.Descriptor instead.
 func (*MinesCashReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{17}
+	return file_login_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *MinesCashReq) GetLoginname() string {
@@ -1255,7 +1263,7 @@ type MinesCashRes struct {
 
 func (x *MinesCashRes) Reset() {
 	*x = MinesCashRes{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[18]
+	mi := &file_login_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1267,7 +1275,7 @@ func (x *MinesCashRes) String() string {
 func (*MinesCashRes) ProtoMessage() {}
 
 func (x *MinesCashRes) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[18]
+	mi := &file_login_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1280,7 +1288,7 @@ func (x *MinesCashRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesCashRes.ProtoReflect.Descriptor instead.
 func (*MinesCashRes) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{18}
+	return file_login_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *MinesCashRes) GetRoundId() string {
@@ -1337,7 +1345,7 @@ type MinesCancelBetReq struct {
 
 func (x *MinesCancelBetReq) Reset() {
 	*x = MinesCancelBetReq{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[19]
+	mi := &file_login_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1349,7 +1357,7 @@ func (x *MinesCancelBetReq) String() string {
 func (*MinesCancelBetReq) ProtoMessage() {}
 
 func (x *MinesCancelBetReq) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[19]
+	mi := &file_login_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1362,7 +1370,7 @@ func (x *MinesCancelBetReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesCancelBetReq.ProtoReflect.Descriptor instead.
 func (*MinesCancelBetReq) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{19}
+	return file_login_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *MinesCancelBetReq) GetLoginname() string {
@@ -1401,7 +1409,7 @@ type MinesCancelBetRes struct {
 
 func (x *MinesCancelBetRes) Reset() {
 	*x = MinesCancelBetRes{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[20]
+	mi := &file_login_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1413,7 +1421,7 @@ func (x *MinesCancelBetRes) String() string {
 func (*MinesCancelBetRes) ProtoMessage() {}
 
 func (x *MinesCancelBetRes) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[20]
+	mi := &file_login_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1426,7 +1434,7 @@ func (x *MinesCancelBetRes) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesCancelBetRes.ProtoReflect.Descriptor instead.
 func (*MinesCancelBetRes) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{20}
+	return file_login_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *MinesCancelBetRes) GetRoundId() string {
@@ -1483,7 +1491,7 @@ type MinesStartJettonNotify struct {
 
 func (x *MinesStartJettonNotify) Reset() {
 	*x = MinesStartJettonNotify{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[21]
+	mi := &file_login_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1495,7 +1503,7 @@ func (x *MinesStartJettonNotify) String() string {
 func (*MinesStartJettonNotify) ProtoMessage() {}
 
 func (x *MinesStartJettonNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[21]
+	mi := &file_login_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1508,7 +1516,7 @@ func (x *MinesStartJettonNotify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MinesStartJettonNotify.ProtoReflect.Descriptor instead.
 func (*MinesStartJettonNotify) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{21}
+	return file_login_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *MinesStartJettonNotify) GetRoundId() string {
@@ -1544,7 +1552,7 @@ type GameStopJettonNotify struct {
 
 func (x *GameStopJettonNotify) Reset() {
 	*x = GameStopJettonNotify{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[22]
+	mi := &file_login_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1556,7 +1564,7 @@ func (x *GameStopJettonNotify) String() string {
 func (*GameStopJettonNotify) ProtoMessage() {}
 
 func (x *GameStopJettonNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[22]
+	mi := &file_login_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1569,7 +1577,7 @@ func (x *GameStopJettonNotify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameStopJettonNotify.ProtoReflect.Descriptor instead.
 func (*GameStopJettonNotify) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{22}
+	return file_login_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *GameStopJettonNotify) GetRoundId() string {
@@ -1605,7 +1613,7 @@ type GameRankInfoNotify struct {
 
 func (x *GameRankInfoNotify) Reset() {
 	*x = GameRankInfoNotify{}
-	mi := &file_internal_model_proto_login_proto_msgTypes[23]
+	mi := &file_login_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1617,7 +1625,7 @@ func (x *GameRankInfoNotify) String() string {
 func (*GameRankInfoNotify) ProtoMessage() {}
 
 func (x *GameRankInfoNotify) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_model_proto_login_proto_msgTypes[23]
+	mi := &file_login_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1630,7 +1638,7 @@ func (x *GameRankInfoNotify) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GameRankInfoNotify.ProtoReflect.Descriptor instead.
 func (*GameRankInfoNotify) Descriptor() ([]byte, []int) {
-	return file_internal_model_proto_login_proto_rawDescGZIP(), []int{23}
+	return file_login_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GameRankInfoNotify) GetRoundId() string {
@@ -1654,18 +1662,18 @@ func (x *GameRankInfoNotify) GetPlayers() []*PlayerInfoSnap {
 	return nil
 }
 
-var File_internal_model_proto_login_proto protoreflect.FileDescriptor
+var File_login_proto protoreflect.FileDescriptor
 
-const file_internal_model_proto_login_proto_rawDesc = "" +
+const file_login_proto_rawDesc = "" +
 	"\n" +
-	" internal/model/proto/login.proto\x12\x05proto\"?\n" +
+	"\vlogin.proto\x12\x05proto\"?\n" +
 	"\tBetRecord\x12\x1a\n" +
 	"\bplayType\x18\x01 \x01(\x05R\bplayType\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\"X\n" +
 	"\fReckonRecord\x12\x1a\n" +
 	"\bplayType\x18\x01 \x01(\x05R\bplayType\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x01R\x06amount\x12\x14\n" +
-	"\x05multi\x18\x03 \x01(\x01R\x05multi\"\xa4\x01\n" +
+	"\x05multi\x18\x03 \x01(\x01R\x05multi\"\xc2\x01\n" +
 	"\n" +
 	"PlayerInfo\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
@@ -1673,7 +1681,8 @@ const file_internal_model_proto_login_proto_rawDesc = "" +
 	"\x06avatar\x18\x03 \x01(\tR\x06avatar\x12\x10\n" +
 	"\x03vip\x18\x04 \x01(\x05R\x03vip\x12\x18\n" +
 	"\abalance\x18\x05 \x01(\x01R\abalance\x12\x1a\n" +
-	"\bcurrency\x18\x06 \x01(\tR\bcurrency\"\x8c\x01\n" +
+	"\bcurrency\x18\x06 \x01(\tR\bcurrency\x12\x1c\n" +
+	"\tloginname\x18\a \x01(\tR\tloginname\"\x8c\x01\n" +
 	"\x0ePlayerInfoSnap\x12%\n" +
 	"\x04info\x18\x01 \x01(\v2\x11.proto.PlayerInfoR\x04info\x12$\n" +
 	"\x04bets\x18\x02 \x03(\v2\x10.proto.BetRecordR\x04bets\x12-\n" +
@@ -1783,20 +1792,20 @@ const file_internal_model_proto_login_proto_rawDesc = "" +
 	"Z\b./;protob\x06proto3"
 
 var (
-	file_internal_model_proto_login_proto_rawDescOnce sync.Once
-	file_internal_model_proto_login_proto_rawDescData []byte
+	file_login_proto_rawDescOnce sync.Once
+	file_login_proto_rawDescData []byte
 )
 
-func file_internal_model_proto_login_proto_rawDescGZIP() []byte {
-	file_internal_model_proto_login_proto_rawDescOnce.Do(func() {
-		file_internal_model_proto_login_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_internal_model_proto_login_proto_rawDesc), len(file_internal_model_proto_login_proto_rawDesc)))
+func file_login_proto_rawDescGZIP() []byte {
+	file_login_proto_rawDescOnce.Do(func() {
+		file_login_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_login_proto_rawDesc), len(file_login_proto_rawDesc)))
 	})
-	return file_internal_model_proto_login_proto_rawDescData
+	return file_login_proto_rawDescData
 }
 
-var file_internal_model_proto_login_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_internal_model_proto_login_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
-var file_internal_model_proto_login_proto_goTypes = []any{
+var file_login_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_login_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_login_proto_goTypes = []any{
 	(KickPlayerNotifyErrtype)(0),   // 0: proto.KickPlayerNotify.errtype
 	(*BetRecord)(nil),              // 1: proto.BetRecord
 	(*ReckonRecord)(nil),           // 2: proto.ReckonRecord
@@ -1823,7 +1832,7 @@ var file_internal_model_proto_login_proto_goTypes = []any{
 	(*GameStopJettonNotify)(nil),   // 23: proto.GameStopJettonNotify
 	(*GameRankInfoNotify)(nil),     // 24: proto.GameRankInfoNotify
 }
-var file_internal_model_proto_login_proto_depIdxs = []int32{
+var file_login_proto_depIdxs = []int32{
 	3, // 0: proto.PlayerInfoSnap.info:type_name -> proto.PlayerInfo
 	1, // 1: proto.PlayerInfoSnap.bets:type_name -> proto.BetRecord
 	2, // 2: proto.PlayerInfoSnap.reckons:type_name -> proto.ReckonRecord
@@ -1840,27 +1849,27 @@ var file_internal_model_proto_login_proto_depIdxs = []int32{
 	0, // [0:9] is the sub-list for field type_name
 }
 
-func init() { file_internal_model_proto_login_proto_init() }
-func file_internal_model_proto_login_proto_init() {
-	if File_internal_model_proto_login_proto != nil {
+func init() { file_login_proto_init() }
+func file_login_proto_init() {
+	if File_login_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_model_proto_login_proto_rawDesc), len(file_internal_model_proto_login_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_login_proto_rawDesc), len(file_login_proto_rawDesc)),
 			NumEnums:      1,
 			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
-		GoTypes:           file_internal_model_proto_login_proto_goTypes,
-		DependencyIndexes: file_internal_model_proto_login_proto_depIdxs,
-		EnumInfos:         file_internal_model_proto_login_proto_enumTypes,
-		MessageInfos:      file_internal_model_proto_login_proto_msgTypes,
+		GoTypes:           file_login_proto_goTypes,
+		DependencyIndexes: file_login_proto_depIdxs,
+		EnumInfos:         file_login_proto_enumTypes,
+		MessageInfos:      file_login_proto_msgTypes,
 	}.Build()
-	File_internal_model_proto_login_proto = out.File
-	file_internal_model_proto_login_proto_goTypes = nil
-	file_internal_model_proto_login_proto_depIdxs = nil
+	File_login_proto = out.File
+	file_login_proto_goTypes = nil
+	file_login_proto_depIdxs = nil
 }

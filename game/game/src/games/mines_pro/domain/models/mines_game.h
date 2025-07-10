@@ -66,7 +66,6 @@ public:
     void updatePlayerCash(const std::string& loginname, const proto::ReckonRecord& reckonRecord);
     void sortRankByBetAmount();  // 按下注金额排序
     void initializeRankInfo();   // 初始化榜单信息（设置roundId和gameType）
-    void clearRankInfo();        // 清空榜单信息
     proto::GameRankInfoNotify getRankInfoNotify() const;  // 线程安全版本，返回副本
     
     // 状态转换方法
@@ -126,12 +125,12 @@ private:
     int stateTransitionTarget_;                     // 状态转换目标时间（-1表示无目标）
     GameStatus targetStatus_;                       // 目标状态
     
-    // 榜单数据结构 - 改为按(玩家,玩法)分开的榜单
-    proto::GameRankInfoNotify rankInfoNotify_;
-    std::unordered_map<std::string, int> playerPlayTypeToRankIndex_;  // "loginname_playtype" -> index in rankInfoNotify_.players()
+    // 下注派奖数据结构
+    proto::GameRankInfoNotify roundPlayerRecord_;
+    std::unordered_map<std::string, int> roundPlayerRecordIndex_;  // "loginname_playtype" -> index in roundPlayerRecord_.players()
     
     
-    mutable std::shared_mutex rankMutex_;           // 保护rankInfoNotify_, playerPlayTypeToRankIndex_
+    mutable std::shared_mutex rankMutex_;           // 保护roundPlayerRecord_, roundPlayerRecordIndex_
     mutable std::shared_mutex gridMutex_;           // 保护grid_相关操作
     
     static constexpr int WAIT_DURATION = 3;           // 写完数据库后等待 3秒,给前端的动画时间
