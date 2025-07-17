@@ -1,0 +1,19 @@
+# 默认处理文本文件
+* text=auto
+
+# 源代码文件统一使用 LF
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.c text eol=lf
+
+# 第三方库不进行行尾符转换
+third_party/** -text
+game/game/third_party/** -text
+
+# 二进制文件
+*.exe binary
+*.dll binary
+*.so binary
+*.a binary
+*.lib binary

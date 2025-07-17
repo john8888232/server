@@ -1,0 +1,21 @@
+#include "user.h"
+
+User::User(int64_t playerId, 
+           int avatarId, 
+           const std::string& loginName, 
+          const std::string& username,
+           const std::string& nickName, 
+           double amount, 
+           int vipLevel, 
+           const std::string& currency,
+           Status playerStatus)
+    : playerId_(playerId),
+      avatarId_(avatarId),
+      loginName_(loginName),
+      username_(username),
+      nickName_(nickName),
+      amount_(amount),
+      vipLevel_(vipLevel),
+      currency_(currency),
+      playerStatus_(playerStatus) {
+}
