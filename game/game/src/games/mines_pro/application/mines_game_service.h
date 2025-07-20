@@ -14,8 +14,8 @@ class GameFactory;
 
 class MinesGameService : public IGameService {
 public:
-    // 构造函数接受factory和依赖注入参数
-    MinesGameService(GameFactory* factory, std::shared_ptr<AppContext> appContext, std::shared_ptr<DatabaseFactory> dbFactory);
+    // 构造函数只接受factory参数，其他依赖从容器中获取
+    MinesGameService(GameFactory* factory);
     virtual ~MinesGameService();
     
     // IGameService接口实现

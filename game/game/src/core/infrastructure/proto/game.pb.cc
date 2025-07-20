@@ -101,7 +101,7 @@ struct GameResultDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 GameResultDefaultTypeInternal _GameResult_default_instance_;
 PROTOBUF_CONSTEXPR HeartBeat::HeartBeat(
     ::_pbi::ConstantInitialized): _impl_{
-    /*decltype(_impl_.timestamp_)*/int64_t{0}
+    /*decltype(_impl_.timestamp_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct HeartBeatDefaultTypeInternal {
   PROTOBUF_CONSTEXPR HeartBeatDefaultTypeInternal()
@@ -192,10 +192,10 @@ PROTOBUF_CONSTEXPR GameSnapshotNotify::GameSnapshotNotify(
     /*decltype(_impl_.result_)*/{}
   , /*decltype(_impl_.roundid_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.gametype_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.remaintime_)*/int64_t{0}
   , /*decltype(_impl_.status_)*/0
-  , /*decltype(_impl_.curindex_)*/0
+  , /*decltype(_impl_.remaintime_)*/0
   , /*decltype(_impl_.curmulti_)*/0
+  , /*decltype(_impl_.curindex_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct GameSnapshotNotifyDefaultTypeInternal {
   PROTOBUF_CONSTEXPR GameSnapshotNotifyDefaultTypeInternal()
@@ -344,7 +344,7 @@ PROTOBUF_CONSTEXPR MinesStartJettonNotify::MinesStartJettonNotify(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.roundid_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.gametype_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.duration_)*/int64_t{0}
+  , /*decltype(_impl_.duration_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct MinesStartJettonNotifyDefaultTypeInternal {
   PROTOBUF_CONSTEXPR MinesStartJettonNotifyDefaultTypeInternal()
@@ -359,7 +359,6 @@ PROTOBUF_CONSTEXPR GameStopJettonNotify::GameStopJettonNotify(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.roundid_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.gametype_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
-  , /*decltype(_impl_.stoptime_)*/int64_t{0}
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct GameStopJettonNotifyDefaultTypeInternal {
   PROTOBUF_CONSTEXPR GameStopJettonNotifyDefaultTypeInternal()
@@ -618,7 +617,6 @@ const uint32_t TableStruct_game_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::proto::GameStopJettonNotify, _impl_.roundid_),
   PROTOBUF_FIELD_OFFSET(::proto::GameStopJettonNotify, _impl_.gametype_),
-  PROTOBUF_FIELD_OFFSET(::proto::GameStopJettonNotify, _impl_.stoptime_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::proto::GameRankInfoNotify, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -658,8 +656,8 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 187, -1, -1, sizeof(::proto::MinesCancelBetRes)},
   { 199, -1, -1, sizeof(::proto::MinesStartJettonNotify)},
   { 208, -1, -1, sizeof(::proto::GameStopJettonNotify)},
-  { 217, -1, -1, sizeof(::proto::GameRankInfoNotify)},
-  { 226, -1, -1, sizeof(::proto::ConnClose)},
+  { 216, -1, -1, sizeof(::proto::GameRankInfoNotify)},
+  { 225, -1, -1, sizeof(::proto::ConnClose)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -701,7 +699,7 @@ const char descriptor_table_protodef_game_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "bets\030\002 \003(\0132\020.proto.BetRecord\022$\n\007reckons\030"
   "\003 \003(\0132\023.proto.ReckonRecord\":\n\nGameResult"
   "\022\016\n\006result\030\001 \001(\005\022\r\n\005multi\030\002 \001(\001\022\r\n\005index"
-  "\030\003 \001(\005\"\036\n\tHeartBeat\022\021\n\ttimestamp\030\001 \001(\003\"c"
+  "\030\003 \001(\005\"\036\n\tHeartBeat\022\021\n\ttimestamp\030\001 \001(\t\"c"
   "\n\010LoginReq\022\021\n\tloginname\030\001 \001(\t\022\r\n\005token\030\002"
   " \001(\t\022\021\n\tgame_type\030\003 \001(\t\022\017\n\007version\030\004 \001(\r"
   "\022\021\n\tclient_ip\030\005 \001(\t\"^\n\tLoginResp\022\021\n\tlogi"
@@ -712,7 +710,7 @@ const char descriptor_table_protodef_game_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "\030\003 \001(\t\"5\n\020KickPlayerNotify\022\021\n\tsessionId\030"
   "\001 \001(\t\022\016\n\006reason\030\002 \001(\005\"\242\001\n\022GameSnapshotNo"
   "tify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022"
-  "\016\n\006status\030\003 \001(\005\022\022\n\nremainTime\030\004 \001(\003\022\020\n\010c"
+  "\016\n\006status\030\003 \001(\005\022\022\n\nremainTime\030\004 \001(\005\022\020\n\010c"
   "urIndex\030\005 \001(\005\022\020\n\010curMulti\030\006 \001(\001\022!\n\006resul"
   "t\030\007 \003(\0132\021.proto.GameResult\"X\n\020MinesPlace"
   "BetReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002 \001"
@@ -737,16 +735,15 @@ const char descriptor_table_protodef_game_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "\001(\t\022\024\n\014refundAmount\030\004 \001(\001\022\017\n\007balance\030\005 \001"
   "(\001\022\020\n\010playType\030\006 \001(\005\"M\n\026MinesStartJetton"
   "Notify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gametype\030\002 \001("
-  "\t\022\020\n\010duration\030\003 \001(\003\"K\n\024GameStopJettonNot"
-  "ify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022\020"
-  "\n\010stopTime\030\003 \001(\003\"_\n\022GameRankInfoNotify\022\017"
-  "\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022&\n\007pla"
-  "yers\030\003 \003(\0132\025.proto.PlayerInfoSnap\"\013\n\tCon"
-  "nCloseb\006proto3"
+  "\t\022\020\n\010duration\030\003 \001(\005\"9\n\024GameStopJettonNot"
+  "ify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\"_"
+  "\n\022GameRankInfoNotify\022\017\n\007roundId\030\001 \001(\t\022\020\n"
+  "\010gameType\030\002 \001(\t\022&\n\007players\030\003 \003(\0132\025.proto"
+  ".PlayerInfoSnap\"\013\n\tConnCloseb\006proto3"
   ;
 static ::_pbi::once_flag descriptor_table_game_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_game_2eproto = {
-    false, false, 2094, descriptor_table_protodef_game_2eproto,
+    false, false, 2076, descriptor_table_protodef_game_2eproto,
     "game.proto",
     &descriptor_table_game_2eproto_once, nullptr, 0, 24,
     schemas, file_default_instances, TableStruct_game_2eproto::offsets,
@@ -2246,7 +2243,14 @@ HeartBeat::HeartBeat(const HeartBeat& from)
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  _this->_impl_.timestamp_ = from._impl_.timestamp_;
+  _impl_.timestamp_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.timestamp_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_timestamp().empty()) {
+    _this->_impl_.timestamp_.Set(from._internal_timestamp(), 
+      _this->GetArenaForAllocation());
+  }
   // @@protoc_insertion_point(copy_constructor:proto.HeartBeat)
 }
 
@@ -2255,9 +2259,13 @@ inline void HeartBeat::SharedCtor(
   (void)arena;
   (void)is_message_owned;
   new (&_impl_) Impl_{
-      decltype(_impl_.timestamp_){int64_t{0}}
+      decltype(_impl_.timestamp_){}
     , /*decltype(_impl_._cached_size_)*/{}
   };
+  _impl_.timestamp_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.timestamp_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 HeartBeat::~HeartBeat() {
@@ -2271,6 +2279,7 @@ HeartBeat::~HeartBeat() {
 
 inline void HeartBeat::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.timestamp_.Destroy();
 }
 
 void HeartBeat::SetCachedSize(int size) const {
@@ -2283,7 +2292,7 @@ void HeartBeat::Clear() {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  _impl_.timestamp_ = int64_t{0};
+  _impl_.timestamp_.ClearToEmpty();
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -2293,11 +2302,13 @@ const char* HeartBeat::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx
     uint32_t tag;
     ptr = ::_pbi::ReadTag(ptr, &tag);
     switch (tag >> 3) {
-      // int64 timestamp = 1;
+      // string timestamp = 1;
       case 1:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
-          _impl_.timestamp_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          auto str = _internal_mutable_timestamp();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "proto.HeartBeat.timestamp"));
         } else
           goto handle_unusual;
         continue;
@@ -2330,10 +2341,14 @@ uint8_t* HeartBeat::_InternalSerialize(
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  // int64 timestamp = 1;
-  if (this->_internal_timestamp() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(1, this->_internal_timestamp(), target);
+  // string timestamp = 1;
+  if (!this->_internal_timestamp().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_timestamp().data(), static_cast<int>(this->_internal_timestamp().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "proto.HeartBeat.timestamp");
+    target = stream->WriteStringMaybeAliased(
+        1, this->_internal_timestamp(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -2352,9 +2367,11 @@ size_t HeartBeat::ByteSizeLong() const {
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  // int64 timestamp = 1;
-  if (this->_internal_timestamp() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_timestamp());
+  // string timestamp = 1;
+  if (!this->_internal_timestamp().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_timestamp());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -2375,7 +2392,7 @@ void HeartBeat::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROT
   uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
-  if (from._internal_timestamp() != 0) {
+  if (!from._internal_timestamp().empty()) {
     _this->_internal_set_timestamp(from._internal_timestamp());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -2394,8 +2411,13 @@ bool HeartBeat::IsInitialized() const {
 
 void HeartBeat::InternalSwap(HeartBeat* other) {
   using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  swap(_impl_.timestamp_, other->_impl_.timestamp_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.timestamp_, lhs_arena,
+      &other->_impl_.timestamp_, rhs_arena
+  );
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata HeartBeat::GetMetadata() const {
@@ -3842,10 +3864,10 @@ GameSnapshotNotify::GameSnapshotNotify(const GameSnapshotNotify& from)
       decltype(_impl_.result_){from._impl_.result_}
     , decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
-    , decltype(_impl_.remaintime_){}
     , decltype(_impl_.status_){}
-    , decltype(_impl_.curindex_){}
+    , decltype(_impl_.remaintime_){}
     , decltype(_impl_.curmulti_){}
+    , decltype(_impl_.curindex_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -3865,9 +3887,9 @@ GameSnapshotNotify::GameSnapshotNotify(const GameSnapshotNotify& from)
     _this->_impl_.gametype_.Set(from._internal_gametype(), 
       _this->GetArenaForAllocation());
   }
-  ::memcpy(&_impl_.remaintime_, &from._impl_.remaintime_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.curmulti_) -
-    reinterpret_cast<char*>(&_impl_.remaintime_)) + sizeof(_impl_.curmulti_));
+  ::memcpy(&_impl_.status_, &from._impl_.status_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.curindex_) -
+    reinterpret_cast<char*>(&_impl_.status_)) + sizeof(_impl_.curindex_));
   // @@protoc_insertion_point(copy_constructor:proto.GameSnapshotNotify)
 }
 
@@ -3879,10 +3901,10 @@ inline void GameSnapshotNotify::SharedCtor(
       decltype(_impl_.result_){arena}
     , decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
-    , decltype(_impl_.remaintime_){int64_t{0}}
     , decltype(_impl_.status_){0}
-    , decltype(_impl_.curindex_){0}
+    , decltype(_impl_.remaintime_){0}
     , decltype(_impl_.curmulti_){0}
+    , decltype(_impl_.curindex_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.roundid_.InitDefault();
@@ -3924,9 +3946,9 @@ void GameSnapshotNotify::Clear() {
   _impl_.result_.Clear();
   _impl_.roundid_.ClearToEmpty();
   _impl_.gametype_.ClearToEmpty();
-  ::memset(&_impl_.remaintime_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.curmulti_) -
-      reinterpret_cast<char*>(&_impl_.remaintime_)) + sizeof(_impl_.curmulti_));
+  ::memset(&_impl_.status_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.curindex_) -
+      reinterpret_cast<char*>(&_impl_.status_)) + sizeof(_impl_.curindex_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -3964,10 +3986,10 @@ const char* GameSnapshotNotify::_InternalParse(const char* ptr, ::_pbi::ParseCon
         } else
           goto handle_unusual;
         continue;
-      // int64 remainTime = 4;
+      // int32 remainTime = 4;
       case 4:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
-          _impl_.remaintime_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          _impl_.remaintime_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -4056,10 +4078,10 @@ uint8_t* GameSnapshotNotify::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_status(), target);
   }
 
-  // int64 remainTime = 4;
+  // int32 remainTime = 4;
   if (this->_internal_remaintime() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(4, this->_internal_remaintime(), target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(4, this->_internal_remaintime(), target);
   }
 
   // int32 curIndex = 5;
@@ -4123,19 +4145,14 @@ size_t GameSnapshotNotify::ByteSizeLong() const {
         this->_internal_gametype());
   }
 
-  // int64 remainTime = 4;
-  if (this->_internal_remaintime() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_remaintime());
-  }
-
   // int32 status = 3;
   if (this->_internal_status() != 0) {
     total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_status());
   }
 
-  // int32 curIndex = 5;
-  if (this->_internal_curindex() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_curindex());
+  // int32 remainTime = 4;
+  if (this->_internal_remaintime() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_remaintime());
   }
 
   // double curMulti = 6;
@@ -4145,6 +4162,11 @@ size_t GameSnapshotNotify::ByteSizeLong() const {
   memcpy(&raw_curmulti, &tmp_curmulti, sizeof(tmp_curmulti));
   if (raw_curmulti != 0) {
     total_size += 1 + 8;
+  }
+
+  // int32 curIndex = 5;
+  if (this->_internal_curindex() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_curindex());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -4172,14 +4194,11 @@ void GameSnapshotNotify::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, con
   if (!from._internal_gametype().empty()) {
     _this->_internal_set_gametype(from._internal_gametype());
   }
-  if (from._internal_remaintime() != 0) {
-    _this->_internal_set_remaintime(from._internal_remaintime());
-  }
   if (from._internal_status() != 0) {
     _this->_internal_set_status(from._internal_status());
   }
-  if (from._internal_curindex() != 0) {
-    _this->_internal_set_curindex(from._internal_curindex());
+  if (from._internal_remaintime() != 0) {
+    _this->_internal_set_remaintime(from._internal_remaintime());
   }
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_curmulti = from._internal_curmulti();
@@ -4187,6 +4206,9 @@ void GameSnapshotNotify::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, con
   memcpy(&raw_curmulti, &tmp_curmulti, sizeof(tmp_curmulti));
   if (raw_curmulti != 0) {
     _this->_internal_set_curmulti(from._internal_curmulti());
+  }
+  if (from._internal_curindex() != 0) {
+    _this->_internal_set_curindex(from._internal_curindex());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -4217,11 +4239,11 @@ void GameSnapshotNotify::InternalSwap(GameSnapshotNotify* other) {
       &other->_impl_.gametype_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(GameSnapshotNotify, _impl_.curmulti_)
-      + sizeof(GameSnapshotNotify::_impl_.curmulti_)
-      - PROTOBUF_FIELD_OFFSET(GameSnapshotNotify, _impl_.remaintime_)>(
-          reinterpret_cast<char*>(&_impl_.remaintime_),
-          reinterpret_cast<char*>(&other->_impl_.remaintime_));
+      PROTOBUF_FIELD_OFFSET(GameSnapshotNotify, _impl_.curindex_)
+      + sizeof(GameSnapshotNotify::_impl_.curindex_)
+      - PROTOBUF_FIELD_OFFSET(GameSnapshotNotify, _impl_.status_)>(
+          reinterpret_cast<char*>(&_impl_.status_),
+          reinterpret_cast<char*>(&other->_impl_.status_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata GameSnapshotNotify::GetMetadata() const {
@@ -7003,7 +7025,7 @@ inline void MinesStartJettonNotify::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
-    , decltype(_impl_.duration_){int64_t{0}}
+    , decltype(_impl_.duration_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.roundid_.InitDefault();
@@ -7043,7 +7065,7 @@ void MinesStartJettonNotify::Clear() {
 
   _impl_.roundid_.ClearToEmpty();
   _impl_.gametype_.ClearToEmpty();
-  _impl_.duration_ = int64_t{0};
+  _impl_.duration_ = 0;
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -7073,10 +7095,10 @@ const char* MinesStartJettonNotify::_InternalParse(const char* ptr, ::_pbi::Pars
         } else
           goto handle_unusual;
         continue;
-      // int64 duration = 3;
+      // int32 duration = 3;
       case 3:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          _impl_.duration_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          _impl_.duration_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -7130,10 +7152,10 @@ uint8_t* MinesStartJettonNotify::_InternalSerialize(
         2, this->_internal_gametype(), target);
   }
 
-  // int64 duration = 3;
+  // int32 duration = 3;
   if (this->_internal_duration() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(3, this->_internal_duration(), target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_duration(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
@@ -7166,9 +7188,9 @@ size_t MinesStartJettonNotify::ByteSizeLong() const {
         this->_internal_gametype());
   }
 
-  // int64 duration = 3;
+  // int32 duration = 3;
   if (this->_internal_duration() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_duration());
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_duration());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -7252,7 +7274,6 @@ GameStopJettonNotify::GameStopJettonNotify(const GameStopJettonNotify& from)
   new (&_impl_) Impl_{
       decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
-    , decltype(_impl_.stoptime_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -7272,7 +7293,6 @@ GameStopJettonNotify::GameStopJettonNotify(const GameStopJettonNotify& from)
     _this->_impl_.gametype_.Set(from._internal_gametype(), 
       _this->GetArenaForAllocation());
   }
-  _this->_impl_.stoptime_ = from._impl_.stoptime_;
   // @@protoc_insertion_point(copy_constructor:proto.GameStopJettonNotify)
 }
 
@@ -7283,7 +7303,6 @@ inline void GameStopJettonNotify::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
-    , decltype(_impl_.stoptime_){int64_t{0}}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.roundid_.InitDefault();
@@ -7323,7 +7342,6 @@ void GameStopJettonNotify::Clear() {
 
   _impl_.roundid_.ClearToEmpty();
   _impl_.gametype_.ClearToEmpty();
-  _impl_.stoptime_ = int64_t{0};
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -7350,14 +7368,6 @@ const char* GameStopJettonNotify::_InternalParse(const char* ptr, ::_pbi::ParseC
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "proto.GameStopJettonNotify.gameType"));
-        } else
-          goto handle_unusual;
-        continue;
-      // int64 stopTime = 3;
-      case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          _impl_.stoptime_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
-          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -7410,12 +7420,6 @@ uint8_t* GameStopJettonNotify::_InternalSerialize(
         2, this->_internal_gametype(), target);
   }
 
-  // int64 stopTime = 3;
-  if (this->_internal_stoptime() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt64ToArray(3, this->_internal_stoptime(), target);
-  }
-
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -7446,11 +7450,6 @@ size_t GameStopJettonNotify::ByteSizeLong() const {
         this->_internal_gametype());
   }
 
-  // int64 stopTime = 3;
-  if (this->_internal_stoptime() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(this->_internal_stoptime());
-  }
-
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -7474,9 +7473,6 @@ void GameStopJettonNotify::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, c
   }
   if (!from._internal_gametype().empty()) {
     _this->_internal_set_gametype(from._internal_gametype());
-  }
-  if (from._internal_stoptime() != 0) {
-    _this->_internal_set_stoptime(from._internal_stoptime());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -7505,7 +7501,6 @@ void GameStopJettonNotify::InternalSwap(GameStopJettonNotify* other) {
       &_impl_.gametype_, lhs_arena,
       &other->_impl_.gametype_, rhs_arena
   );
-  swap(_impl_.stoptime_, other->_impl_.stoptime_);
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata GameStopJettonNotify::GetMetadata() const {

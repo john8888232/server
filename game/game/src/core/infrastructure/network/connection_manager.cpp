@@ -19,8 +19,6 @@ ConnectionManager::~ConnectionManager() {
 }
 
 void ConnectionManager::startSessionCleanupTimer(int intervalSeconds) {
-    std::unique_lock<std::shared_mutex> lock(configMutex_);
-    
     if (sessionCleanupTimer_ != nullptr) {
         LOG_WARN("Session cleanup timer already started");
         return;
@@ -36,8 +34,6 @@ void ConnectionManager::startSessionCleanupTimer(int intervalSeconds) {
 }
 
 void ConnectionManager::stopSessionCleanupTimer() {
-    std::unique_lock<std::shared_mutex> lock(configMutex_);
-    
     if (sessionCleanupTimer_) {
         sessionCleanupTimer_->close([](uv::Timer* timer) {
             delete timer;
@@ -48,7 +44,6 @@ void ConnectionManager::stopSessionCleanupTimer() {
 }
 
 void ConnectionManager::setSendMessageCallback(SendMessageCallback callback) {
-    std::unique_lock<std::shared_mutex> lock(configMutex_);
     sendMessageCallback_ = callback;
 }
 
@@ -63,8 +58,8 @@ std::string ConnectionManager::registerGateway(std::weak_ptr<uv::TcpConnection> 
     std::string gatewayId = conn->Name();
     std::string name = gatewayName.empty() ? ("Gateway_" + gatewayId) : gatewayName;
     
-    // 获取针对此gatewayId的锁
-    std::unique_lock<std::shared_mutex> lock(gatewayMutex_.getMutexForKey(gatewayId));
+    // 使用gateway锁
+    std::unique_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
     
     auto gateway = std::make_shared<GatewayConnection>(gatewayId, name, connection);
     gateways_[gatewayId] = gateway;
@@ -74,55 +69,73 @@ std::string ConnectionManager::registerGateway(std::weak_ptr<uv::TcpConnection> 
 }
 
 bool ConnectionManager::unregisterGateway(const std::string& gatewayId) {
-    // 获取针对此gatewayId的锁
-    std::unique_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
+    std::vector<std::string> sessionsToCleanup;
     
-    auto it = gateways_.find(gatewayId);
-    if (it == gateways_.end()) {
-        LOG_WARN("Gateway %s not found for unregistration", gatewayId.c_str());
-        return false;
-    }
-    
-    // 获取该gateway关联的所有会话
-    std::vector<std::string> sessionsToRemove;
+    // 第一阶段：获取gateway信息和需要清理的会话列表
     {
-        // 首先获取会话列表，不需要持有锁太久
-        auto sessIt = gatewayPlayerSessions_.find(gatewayId);
-        if (sessIt != gatewayPlayerSessions_.end()) {
-            sessionsToRemove = sessIt->second;
-            gatewayPlayerSessions_.erase(sessIt);
-        }
-    }
-    
-    // 逐个处理会话，每个会话使用自己的锁
-    for (const auto& sessionId : sessionsToRemove) {
-        // 为每个会话获取对应的锁
-        std::unique_lock<std::shared_mutex> sessionLock(playerSessionMutex_.getMutexForKey(sessionId));
+        // 首先获取gateway锁
+        std::unique_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
         
-        auto sessionIt = playerSessions_.find(sessionId);
-        if (sessionIt != playerSessions_.end()) {
-            auto playerSession = sessionIt->second;
-            
-            if (playerSession && !playerSession->getLoginname().empty()) {
-                // 需要移除loginname映射
-                loginnameToSession_.erase(playerSession->getLoginname());
-            }
-            
-            playerSessions_.erase(sessionId);
-            LOG_INFO("Removed player session %s due to gateway disconnection", sessionId.c_str());
+        auto it = gateways_.find(gatewayId);
+        if (it == gateways_.end()) {
+            LOG_WARN("Gateway %s not found for unregistration", gatewayId.c_str());
+            return false;
         }
+        
+        // 获取需要清理的会话ID列表
+        {
+            // 获取全局锁处理相关联的玩家会话
+            std::unique_lock<std::shared_mutex> globalLock(globalMutex_);
+            
+            auto sessIt = gatewayPlayerSessions_.find(gatewayId);
+            if (sessIt != gatewayPlayerSessions_.end()) {
+                sessionsToCleanup = sessIt->second;
+                gatewayPlayerSessions_.erase(sessIt);
+            }
+        }
+        
+        // 删除网关
+        gateways_.erase(it);
     }
     
-    // 最后移除Gateway
-    gateways_.erase(it);
+    // 第二阶段：清理玩家会话，在gateway锁释放后进行
+    for (const auto& sessionId : sessionsToCleanup) {
+        // 获取玩家锁
+        std::unique_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(sessionId));
+        
+        auto it = playerSessions_.find(sessionId);
+        if (it == playerSessions_.end()) {
+            continue; // 会话可能已被其他操作删除
+        }
+        
+        auto playerSession = it->second;
+        std::string loginname;
+        
+        if (playerSession && !playerSession->getLoginname().empty()) {
+            loginname = playerSession->getLoginname();
+        }
+        
+        playerSessions_.erase(sessionId);
+        
+        // 如果有loginname，需要获取全局锁清理映射
+        if (!loginname.empty()) {
+            std::unique_lock<std::shared_mutex> globalLock(globalMutex_);
+            auto lnIt = loginnameToSession_.find(loginname);
+            if (lnIt != loginnameToSession_.end() && lnIt->second->getSessionId() == sessionId) {
+                loginnameToSession_.erase(lnIt);
+            }
+        }
+        
+        LOG_INFO("Removed player session %s due to gateway disconnection", sessionId.c_str());
+    }
     
     LOG_INFO("Gateway unregistered: %s", gatewayId.c_str());
     return true;
 }
 
 std::shared_ptr<GatewayConnection> ConnectionManager::getGateway(const std::string& gatewayId) {
-    // 获取针对此gatewayId的共享锁（只读）
-    std::shared_lock<std::shared_mutex> lock(gatewayMutex_.getMutexForKey(gatewayId));
+    // 使用共享锁读取gateway
+    std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
     
     auto it = gateways_.find(gatewayId);
     if (it != gateways_.end()) {
@@ -138,40 +151,54 @@ bool ConnectionManager::registerPlayerSession(const std::string& playerSessionId
         return false;
     }
     
-    // 检查Gateway是否存在 - 使用共享锁
+    // 检查Gateway是否存在
+    bool gatewayExists = false;
     {
         std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
-        if (gateways_.find(gatewayId) == gateways_.end()) {
-            LOG_ERROR("Cannot register player session %s: Gateway %s not found", 
-                    playerSessionId.c_str(), gatewayId.c_str());
-            return false;
-        }
+        gatewayExists = (gateways_.find(gatewayId) != gateways_.end());
     }
     
-    // 获取针对session的独占锁
-    std::unique_lock<std::shared_mutex> sessionLock(playerSessionMutex_.getMutexForKey(playerSessionId));
-    
-    // 检查会话是否已存在
-    auto existingSessionIt = playerSessions_.find(playerSessionId);
-    if (existingSessionIt != playerSessions_.end()) {
-        LOG_WARN("Player session %s already exists, updating gateway mapping", playerSessionId.c_str());
-        
-        // 如果有旧的loginname映射，先移除
-        if (!existingSessionIt->second->getLoginname().empty()) {
-            loginnameToSession_.erase(existingSessionIt->second->getLoginname());
-        }
+    if (!gatewayExists) {
+        LOG_ERROR("Cannot register player session %s: Gateway %s not found", 
+                playerSessionId.c_str(), gatewayId.c_str());
+        return false;
     }
     
+    // 创建会话对象
     auto session = std::make_shared<PlayerSession>(playerSessionId, gatewayId, loginname);
-    playerSessions_[playerSessionId] = session;
     
-    // 如果提供了loginname，建立loginname到session的映射
+    // 第一阶段：更新玩家会话
+    {
+        // 获取玩家锁
+        std::unique_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
+        
+        // 检查会话是否已存在
+        auto existingSessionIt = playerSessions_.find(playerSessionId);
+        if (existingSessionIt != playerSessions_.end()) {
+            LOG_WARN("Player session %s already exists, updating gateway mapping", playerSessionId.c_str());
+        }
+        
+        // 保存会话
+        playerSessions_[playerSessionId] = session;
+    }
+    
+    // 第二阶段：更新loginname映射（如果有）
     if (!loginname.empty()) {
+        std::unique_lock<std::shared_mutex> globalLock(globalMutex_);
+        
+        // 检查是否已有相同登录名的会话
+        auto existingIt = loginnameToSession_.find(loginname);
+        if (existingIt != loginnameToSession_.end() && existingIt->second->getSessionId() != playerSessionId) {
+            LOG_WARN("Loginname %s already mapped to session %s, will be remapped", 
+                    loginname.c_str(), existingIt->second->getSessionId().c_str());
+        }
+        
+        // 更新映射
         loginnameToSession_[loginname] = session;
         LOG_INFO("Mapped loginname %s to session %s", loginname.c_str(), playerSessionId.c_str());
     }
     
-    // 更新反向映射 - 需要gateway锁
+    // 第三阶段：更新反向映射
     {
         std::unique_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
         gatewayPlayerSessions_[gatewayId].push_back(playerSessionId);
@@ -183,25 +210,37 @@ bool ConnectionManager::registerPlayerSession(const std::string& playerSessionId
 }
 
 bool ConnectionManager::unregisterPlayerSession(const std::string& playerSessionId) {
-    // 获取针对session的独占锁
-    std::unique_lock<std::shared_mutex> sessionLock(playerSessionMutex_.getMutexForKey(playerSessionId));
+    std::string gatewayId;
+    std::string loginname;
     
-    auto it = playerSessions_.find(playerSessionId);
-    if (it == playerSessions_.end()) {
-        LOG_WARN("Player session %s not found for unregistration", playerSessionId.c_str());
-        return false;
+    // 第一阶段：获取会话信息
+    {
+        // 获取玩家锁
+        std::unique_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
+        
+        auto it = playerSessions_.find(playerSessionId);
+        if (it == playerSessions_.end()) {
+            LOG_WARN("Player session %s not found for unregistration", playerSessionId.c_str());
+            return false;
+        }
+        
+        gatewayId = it->second->getGatewayId();
+        loginname = it->second->getLoginname();
+        
+        // 删除玩家会话
+        playerSessions_.erase(it);
     }
     
-    std::string gatewayId = it->second->getGatewayId();
-    
-    // 如果有loginname映射，移除它
-    if (!it->second->getLoginname().empty()) {
-        loginnameToSession_.erase(it->second->getLoginname());
+    // 第二阶段：清理loginname映射（如果有）
+    if (!loginname.empty()) {
+        std::unique_lock<std::shared_mutex> globalLock(globalMutex_);
+        auto it = loginnameToSession_.find(loginname);
+        if (it != loginnameToSession_.end() && it->second->getSessionId() == playerSessionId) {
+            loginnameToSession_.erase(it);
+        }
     }
     
-    playerSessions_.erase(it);
-    
-    // 从反向映射中移除 - 需要gateway锁
+    // 第三阶段：清理gateway反向映射
     {
         std::unique_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
         auto gwIt = gatewayPlayerSessions_.find(gatewayId);
@@ -220,8 +259,8 @@ bool ConnectionManager::unregisterPlayerSession(const std::string& playerSession
 }
 
 std::shared_ptr<PlayerSession> ConnectionManager::getPlayerSession(const std::string& playerSessionId) {
-    // 获取针对session的共享锁（只读）
-    std::shared_lock<std::shared_mutex> lock(playerSessionMutex_.getMutexForKey(playerSessionId));
+    // 使用共享锁读取玩家会话
+    std::shared_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
     
     auto it = playerSessions_.find(playerSessionId);
     if (it != playerSessions_.end()) {
@@ -231,10 +270,8 @@ std::shared_ptr<PlayerSession> ConnectionManager::getPlayerSession(const std::st
 }
 
 std::shared_ptr<PlayerSession> ConnectionManager::getPlayerSessionByLoginname(const std::string& loginname) {
-    // 为loginname映射创建一个简单的哈希获取锁
-    // 注意：这个简单实现可能会导致loginname和sessionId的锁冲突，
-    // 但对于大多数情况下，这应该是可以接受的
-    std::shared_lock<std::shared_mutex> lock(playerSessionMutex_.getMutexForKey(loginname));
+    // 使用全局共享锁查找loginname映射
+    std::shared_lock<std::shared_mutex> globalLock(globalMutex_);
     
     auto it = loginnameToSession_.find(loginname);
     if (it != loginnameToSession_.end()) {
@@ -244,8 +281,8 @@ std::shared_ptr<PlayerSession> ConnectionManager::getPlayerSessionByLoginname(co
 }
 
 void ConnectionManager::updatePlayerSessionActiveTime(const std::string& playerSessionId) {
-    // 获取针对session的独占锁
-    std::unique_lock<std::shared_mutex> lock(playerSessionMutex_.getMutexForKey(playerSessionId));
+    // 使用玩家锁更新活跃时间
+    std::unique_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
     
     auto it = playerSessions_.find(playerSessionId);
     if (it != playerSessions_.end()) {
@@ -255,20 +292,16 @@ void ConnectionManager::updatePlayerSessionActiveTime(const std::string& playerS
 }
 
 bool ConnectionManager::sendToPlayer(const std::string& playerSessionId, uint32_t msgId, const std::string& data) {
-    // 首先检查回调函数
-    {
-        std::shared_lock<std::shared_mutex> configLock(configMutex_);
-        if (!sendMessageCallback_) {
-            LOG_ERROR("Send message callback not set");
-            return false;
-        }
+    if (!sendMessageCallback_) {
+        LOG_ERROR("Send message callback not set");
+        return false;
     }
     
-    // 获取玩家会话信息 - 只读
+    // 获取玩家会话信息（使用共享锁）
     std::shared_ptr<PlayerSession> session;
     std::string gatewayId;
     {
-        std::shared_lock<std::shared_mutex> sessionLock(playerSessionMutex_.getMutexForKey(playerSessionId));
+        std::shared_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
         auto it = playerSessions_.find(playerSessionId);
         if (it == playerSessions_.end()) {
             LOG_ERROR("Player session %s not found", playerSessionId.c_str());
@@ -278,54 +311,43 @@ bool ConnectionManager::sendToPlayer(const std::string& playerSessionId, uint32_
         gatewayId = session->getGatewayId();
     }
     
-    // 获取Gateway连接 - 只读
-    std::weak_ptr<uv::TcpConnection> connection;
+    // 获取Gateway连接（使用共享锁）
+    std::weak_ptr<uv::TcpConnection> conn;
     {
         std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
         auto it = gateways_.find(gatewayId);
         if (it == gateways_.end()) {
-            LOG_ERROR("Gateway %s not found for player session %s", 
-                    gatewayId.c_str(), playerSessionId.c_str());
+            LOG_ERROR("Gateway %s not found for player session %s", gatewayId.c_str(), playerSessionId.c_str());
             return false;
         }
-        connection = it->second->connection;
+        conn = it->second->connection;
     }
     
     // 通过回调发送消息到Gateway，Gateway会转发给玩家
-    std::shared_lock<std::shared_mutex> configLock(configMutex_);
-    return sendMessageCallback_(connection, msgId, data, playerSessionId);
+    return sendMessageCallback_(conn, msgId, data, playerSessionId);
 }
 
 bool ConnectionManager::sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data) {
-    // 首先检查回调函数
-    {
-        std::shared_lock<std::shared_mutex> configLock(configMutex_);
-        if (!sendMessageCallback_) {
-            LOG_ERROR("Send message callback not set");
-            return false;
-        }
+    if (!sendMessageCallback_) {
+        LOG_ERROR("Send message callback not set");
+        return false;
     }
     
-    // 获取Gateway连接 - 只读
-    std::weak_ptr<uv::TcpConnection> connection;
-    {
-        std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
-        auto it = gateways_.find(gatewayId);
-        if (it == gateways_.end()) {
-            LOG_ERROR("Gateway %s not found", gatewayId.c_str());
-            return false;
-        }
-        connection = it->second->connection;
+    // 使用gateway的共享锁
+    std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
+    
+    auto it = gateways_.find(gatewayId);
+    if (it == gateways_.end()) {
+        LOG_ERROR("Gateway %s not found", gatewayId.c_str());
+        return false;
     }
     
-    // 发送系统消息到Gateway
-    std::shared_lock<std::shared_mutex> configLock(configMutex_);
-    return sendMessageCallback_(connection, msgId, data, "");
+    return sendMessageCallback_(it->second->connection, msgId, data, "");
 }
 
 std::vector<std::string> ConnectionManager::getPlayerSessionsByGateway(const std::string& gatewayId) {
-    // 获取针对gateway的共享锁（只读）
-    std::shared_lock<std::shared_mutex> lock(gatewayMutex_.getMutexForKey(gatewayId));
+    // 使用gateway的共享锁
+    std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
     
     auto it = gatewayPlayerSessions_.find(gatewayId);
     if (it != gatewayPlayerSessions_.end()) {
@@ -335,129 +357,195 @@ std::vector<std::string> ConnectionManager::getPlayerSessionsByGateway(const std
 }
 
 std::vector<std::string> ConnectionManager::getAllGateways() {
-    std::vector<std::string> result;
+    // 使用全局共享锁获取所有gateway ID
+    std::shared_lock<std::shared_mutex> globalLock(globalMutex_);
     
-    // 这是一个遍历所有gateway的操作，需要对整个gateway集合加锁
-    // 理论上可以分片锁定，但简单起见，我们获取所有gateway分片的共享锁
-    gatewayMutex_.lockSharedAll();
-    
-    result.reserve(gateways_.size());
+    std::vector<std::string> gatewayIds;
     for (const auto& pair : gateways_) {
-        result.push_back(pair.first);
+        gatewayIds.push_back(pair.first);
     }
-    
-    gatewayMutex_.unlockSharedAll();
-    return result;
+    return gatewayIds;
 }
 
 size_t ConnectionManager::getGatewayCount() const {
-    // 这是一个统计操作，需要对整个gateway集合加锁
-    gatewayMutex_.lockSharedAll();
-    size_t count = gateways_.size();
-    gatewayMutex_.unlockSharedAll();
-    
-    return count;
+    // 使用全局共享锁
+    std::shared_lock<std::shared_mutex> globalLock(globalMutex_);
+    return gateways_.size();
 }
 
 size_t ConnectionManager::getPlayerSessionCount() const {
-    // 这是一个统计操作，需要对整个player session集合加锁
-    playerSessionMutex_.lockSharedAll();
-    size_t count = playerSessions_.size();
-    playerSessionMutex_.unlockSharedAll();
-    
-    return count;
+    // 使用全局共享锁
+    std::shared_lock<std::shared_mutex> globalLock(globalMutex_);
+    return playerSessions_.size();
 }
 
 void ConnectionManager::cleanupInactiveSessions(int timeoutSeconds) {
-    auto now = std::chrono::system_clock::now();
-    std::vector<std::string> sessionsToRemove;
+    std::vector<std::string> sessionsToKick;
     
-    // 收集需要清理的会话 - 只读操作
-    playerSessionMutex_.lockSharedAll();
-    
-    for (const auto& pair : playerSessions_) {
-        const auto& session = pair.second;
-        auto lastActiveTime = session->getLastActiveTime();
-        auto inactiveTime = std::chrono::duration_cast<std::chrono::seconds>(now - lastActiveTime).count();
+    // 使用全局共享锁收集过期会话
+    {
+        std::shared_lock<std::shared_mutex> globalLock(globalMutex_);
         
-        if (inactiveTime > timeoutSeconds) {
-            sessionsToRemove.push_back(pair.first);
-            LOG_INFO("Session %s inactive for %d seconds, marking for cleanup", 
-                     pair.first.c_str(), static_cast<int>(inactiveTime));
+        for (const auto& pair : playerSessions_) {
+            if (pair.second->isExpired(timeoutSeconds)) {
+                sessionsToKick.push_back(pair.first);
+            }
         }
     }
     
-    playerSessionMutex_.unlockSharedAll();
+    if (sessionsToKick.empty()) {
+        return;
+    }
     
-    // 逐个清理会话
-    for (const auto& sessionId : sessionsToRemove) {
+    LOG_DEBUG("Found %d inactive sessions to clean up", sessionsToKick.size());
+    
+    for (const auto& sessionId : sessionsToKick) {
+        // 对每个会话使用独立的锁
+        std::shared_ptr<PlayerSession> session;
+        {
+            std::shared_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(sessionId));
+            auto it = playerSessions_.find(sessionId);
+            if (it == playerSessions_.end()) {
+                continue;
+            }
+            session = it->second;
+        }
+        
+        if (!session->getLoginname().empty()) {
+            LOG_INFO("Sending kick notification for inactive session %s (loginname: %s)", 
+                     sessionId.c_str(), session->getLoginname().c_str());
+            proto::KickPlayerNotify notify;
+            notify.set_sessionid(sessionId);
+            notify.set_reason(ErrorCode::INACTIVE); // 长时间未活动
+            sendToPlayer(sessionId, Protocol::SC_KICK_PLAYER_NOTIFY, notify.SerializeAsString());
+        }
+        
+        LOG_INFO("Cleaning up inactive session: %s", sessionId.c_str());
         unregisterPlayerSession(sessionId);
     }
     
-    if (!sessionsToRemove.empty()) {
-        LOG_INFO("Cleaned up %zu inactive sessions", sessionsToRemove.size());
-    }
+    LOG_INFO("Cleaned up %d inactive sessions", sessionsToKick.size());
 }
 
 std::string ConnectionManager::getGatewayIdBySessionId(const std::string& sessionId) {
-    // 获取针对session的共享锁（只读）
-    std::shared_lock<std::shared_mutex> lock(playerSessionMutex_.getMutexForKey(sessionId));
+    // 使用玩家锁
+    std::shared_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(sessionId));
     
     auto it = playerSessions_.find(sessionId);
     if (it != playerSessions_.end()) {
         return it->second->getGatewayId();
     }
+    
     return "";
 }
 
 bool ConnectionManager::createBasicPlayerSession(const std::string& playerSessionId, const std::string& gatewayId) {
-    return registerPlayerSession(playerSessionId, gatewayId, "");
+    // 检查网关是否存在
+    bool gatewayExists = false;
+    {
+        std::shared_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
+        gatewayExists = (gateways_.find(gatewayId) != gateways_.end());
+    }
+    
+    if (!gatewayExists) {
+        LOG_ERROR("Gateway %s not found", gatewayId.c_str());
+        return false;
+    }
+    
+    // 创建会话对象
+    auto session = std::make_shared<PlayerSession>(playerSessionId, gatewayId, "");
+    
+    // 第一阶段：更新玩家会话
+    {
+        // 获取玩家锁
+        std::unique_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
+        
+        // 检查会话是否已存在
+        if (playerSessions_.find(playerSessionId) != playerSessions_.end()) {
+            LOG_WARN("Player session %s already exists", playerSessionId.c_str());
+            return false;
+        }
+        
+        // 保存会话
+        playerSessions_[playerSessionId] = session;
+    }
+    
+    // 第二阶段：更新反向映射
+    {
+        std::unique_lock<std::shared_mutex> gatewayLock(gatewayMutex_.getMutexForKey(gatewayId));
+        gatewayPlayerSessions_[gatewayId].push_back(playerSessionId);
+    }
+    
+    LOG_INFO("Basic player session created: %s -> Gateway: %s", 
+             playerSessionId.c_str(), gatewayId.c_str());
+    return true;
 }
 
 bool ConnectionManager::completePlayerSession(const std::string& playerSessionId, const std::string& loginname, std::shared_ptr<User> user) {
-    if (loginname.empty()) {
-        LOG_ERROR("Cannot complete player session with empty loginname");
-        return false;
-    }
+    // 准备踢人消息的数据，避免在锁内部发送消息
+    std::string oldSessionIdToKick;
+    std::string oldGatewayId;
+    std::string kickMessageData;
+    bool needKickOldSession = false;
+    std::shared_ptr<PlayerSession> session;
     
-    // 获取针对session的独占锁
-    std::unique_lock<std::shared_mutex> sessionLock(playerSessionMutex_.getMutexForKey(playerSessionId));
-    
-    // 查找会话
-    auto it = playerSessions_.find(playerSessionId);
-    if (it == playerSessions_.end()) {
-        LOG_ERROR("Player session %s not found for completion", playerSessionId.c_str());
-        return false;
-    }
-    
-    auto session = it->second;
-    
-    // 检查是否已经有登录名
-    if (!session->getLoginname().empty()) {
-        // 如果登录名相同，说明已经完成过，直接更新用户数据即可
-        if (session->getLoginname() == loginname) {
-            session->setPlayer(user);
-            session->updateActiveTime();
-            LOG_INFO("Updated existing player session %s for user %s", 
-                     playerSessionId.c_str(), loginname.c_str());
-            return true;
+    // 第一阶段：收集信息和准备数据
+    {
+        // 先获取玩家锁
+        std::unique_lock<std::shared_mutex> playerLock(playerMutex_.getMutexForKey(playerSessionId));
+        
+        // 检查玩家会话是否存在
+        auto it = playerSessions_.find(playerSessionId);
+        if (it == playerSessions_.end()) {
+            LOG_ERROR("Player session %s not found for completion", playerSessionId.c_str());
+            return false;
         }
         
-        // 如果登录名不同，需要先移除旧的映射
-        loginnameToSession_.erase(session->getLoginname());
-        LOG_INFO("Changing loginname for session %s: %s -> %s", 
-                 playerSessionId.c_str(), session->getLoginname().c_str(), loginname.c_str());
+        session = it->second;
+        
+        // 补全会话信息，在玩家锁内更新
+        session->setLoginname(loginname);
+        session->setPlayer(user);
     }
     
-    // 更新会话
-    session->setLoginname(loginname);
-    session->setPlayer(user);
-    session->updateActiveTime();
+    // 处理loginname映射和检查是否有旧会话
+    if (!loginname.empty()) {
+        // 获取全局锁处理loginname映射
+        std::unique_lock<std::shared_mutex> globalLock(globalMutex_);
+        
+        // 检查是否已有相同登录名的会话
+        auto existingIt = loginnameToSession_.find(loginname);
+        if (existingIt != loginnameToSession_.end() && existingIt->second->getSessionId() != playerSessionId) {
+            oldSessionIdToKick = existingIt->second->getSessionId();
+            oldGatewayId = existingIt->second->getGatewayId();
+            needKickOldSession = true;
+            
+            // 准备踢人消息
+            proto::KickPlayerNotify notify;
+            notify.set_sessionid(oldSessionIdToKick);
+            notify.set_reason(ErrorCode::OTHER_LOGIN);
+            notify.SerializeToString(&kickMessageData);
+            
+            LOG_INFO("Player %s already has an active session %s, will kick out", 
+                     loginname.c_str(), oldSessionIdToKick.c_str());
+        }
+        
+        // 建立loginname到session的映射
+        loginnameToSession_[loginname] = session;
+        LOG_INFO("Mapped loginname %s to session %s", loginname.c_str(), playerSessionId.c_str());
+    }
     
-    // 更新loginname映射
-    loginnameToSession_[loginname] = session;
+    // 第二阶段：在锁外发送踢人消息
+    if (needKickOldSession) {
+        sendToPlayer(oldSessionIdToKick, Protocol::SC_KICK_PLAYER_NOTIFY, kickMessageData);
+        LOG_INFO("Sent kick notification to old session %s", oldSessionIdToKick.c_str());
+        
+        // 第三阶段：清理旧会话
+        unregisterPlayerSession(oldSessionIdToKick);
+    }
     
-    LOG_INFO("Completed player session %s for user %s", playerSessionId.c_str(), loginname.c_str());
+    LOG_INFO("Player session completed: %s -> loginname: %s", 
+             playerSessionId.c_str(), loginname.c_str());
     return true;
 }
 

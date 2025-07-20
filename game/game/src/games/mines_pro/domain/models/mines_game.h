@@ -21,8 +21,8 @@ using json = nlohmann::json;
 
 class MinesGame : public IGame {
 public:
-    // 构造函数，接收AppContext和DatabaseFactory作为依赖
-    MinesGame(std::shared_ptr<AppContext> appContext, std::shared_ptr<DatabaseFactory> dbFactory);
+    // 构造函数，从依赖容器获取依赖
+    MinesGame();
     ~MinesGame();
     
     // IGame接口实现

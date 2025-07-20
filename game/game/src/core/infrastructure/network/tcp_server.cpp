@@ -13,7 +13,8 @@
 TcpServer::TcpServer(uv::EventLoop* loop) 
     : loop_(loop), messageRouter_(nullptr), 
       connectionManager_(loop),
-      threadPoolSize_(8), maxQueueSizePerWorker_(1000) {
+      threadPoolSize_(8), maxQueueSizePerWorker_(1000),
+      serverNumericId_(1) {
     
     // 设置为大端模式
     uv::Packet::Mode = uv::Packet::DataMode::BigEndian;
@@ -34,10 +35,32 @@ bool TcpServer::initialize(const ConfigManager& configManager) {
         threadPoolSize_ = configManager.getServerConfig()["server"]["thread_pool_size"].get<size_t>();
         maxQueueSizePerWorker_ = configManager.getServerConfig()["server"]["max_queue_size_per_worker"].get<size_t>();
         
+        // 从配置中读取服务器ID
+        const auto& serverConfig = configManager.getServerConfig();
+        serverId_ = "default-server";
+        if (serverConfig.contains("consul") && serverConfig["consul"].contains("service_id")) {
+            serverId_ = serverConfig["consul"]["service_id"].get<std::string>();
+        }
+        
+        // 从服务器ID中提取数字部分，例如从"game_server_1"中提取"1"
+        std::string serverIdNum = "1"; // 默认值
+        size_t underscorePos = serverId_.find_last_of('_');
+        if (underscorePos != std::string::npos && underscorePos + 1 < serverId_.length()) {
+            serverIdNum = serverId_.substr(underscorePos + 1);
+        }
+        
+        // 尝试将提取的数字部分转换为整数
+        try {
+            serverNumericId_ = std::stoull(serverIdNum);
+        } catch (const std::exception& e) {
+            LOG_WARN("Failed to parse server numeric ID from %s, using default value 1", serverIdNum.c_str());
+            serverNumericId_ = 1;
+        }
+        
         sessionThreadPool_ = std::make_unique<SessionThreadPool>(threadPoolSize_);
         
-        LOG_DEBUG("TCP server initialized - Port: %d, ThreadPool: %d, MaxQueuePerWorker: %d", 
-                 port_,  threadPoolSize_, maxQueueSizePerWorker_);
+        LOG_DEBUG("TCP server initialized - Port: %d, ThreadPool: %d, MaxQueuePerWorker: %d, ServerId: %s, ServerNumericId: %llu", 
+                 port_, threadPoolSize_, maxQueueSizePerWorker_, serverId_.c_str(), serverNumericId_);
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR("Error initializing TCP server: %s", e.what());

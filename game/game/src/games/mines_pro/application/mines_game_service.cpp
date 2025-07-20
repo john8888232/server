@@ -7,9 +7,25 @@
 #include <ctime>
 #include <third_party/libuv_cpp/include/LogWriter.hpp>
 #include "games/game_factory.h"
+#include "core/infrastructure/common/dependency_container.h"
 
-MinesGameService::MinesGameService(GameFactory* factory, std::shared_ptr<AppContext> appContext, std::shared_ptr<DatabaseFactory> dbFactory)
-    : factory_(factory), appContext_(appContext), dbFactory_(dbFactory) {
+extern DependencyContainer& getDependencyContainer();
+
+MinesGameService::MinesGameService(GameFactory* factory)
+    : factory_(factory) {
+    // 从依赖容器中获取依赖
+    auto& container = getDependencyContainer();
+    appContext_ = container.resolve<AppContext>();
+    dbFactory_ = container.resolve<DatabaseFactory>();
+    
+    if (!appContext_) {
+        LOG_ERROR("Failed to resolve AppContext from dependency container");
+    }
+    
+    if (!dbFactory_) {
+        LOG_ERROR("Failed to resolve DatabaseFactory from dependency container");
+    }
+    
     LOG_DEBUG("MinesGameService initialized");
 }
 
@@ -33,7 +49,8 @@ std::shared_ptr<IGame> MinesGameService::createGame() {
         return nullptr;
     }
     
-    auto game = std::make_shared<MinesGame>(appContext_, dbFactory_);
+    // 使用无参构造函数创建MinesGame
+    auto game = std::make_shared<MinesGame>();
     const auto& config = factory_->getConfig();
     LOG_INFO("Creating MinesGame with config: %s", config.dump().c_str());
     game->initializeWithConfig(config);

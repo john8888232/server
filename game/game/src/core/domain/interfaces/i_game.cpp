@@ -122,82 +122,42 @@ void IGame::handlePlayerDisconnect(const std::string& loginname) {
     setPlayerInactive(loginname);
 }
 
-std::string IGame::generateRoundId(const std::string& gameType) {
-    // 生成格式: 4位游戏类型ID + 4位服务器ID + 12位时间戳(年月日时分秒) + 5位随机数
+std::string IGame::generateRoundId() {
+    // 使用雪花算法: 1位符号位(0) + 41位时间戳 + 10位机器ID + 12位序列号
+    static std::atomic<uint64_t> sequence{0};
+    static const uint64_t EPOCH = 1640995200000; // 2022-01-01 00:00:00 UTC
     
-    // 获取游戏类型对应的数字ID (4位，不足补0)
-    int gameTypeId = getGameTypeId(gameType);
-    std::stringstream gameTypeStream;
-    gameTypeStream << std::setfill('0') << std::setw(4) << gameTypeId;
-    std::string gameTypePart = gameTypeStream.str();
+    // 获取游戏类型对应的数字ID
+    int gameTypeId = getGameTypeId(gameType_);
     
-    std::string serverId = "default";
-    std::string serverIdNum = "0";
+    // 获取服务器ID作为机器ID
+    uint64_t machineId = 1; // 默认值
     
     // 从依赖容器获取AppContext
     auto& container = getDependencyContainer();
     auto appContext = container.resolve<AppContext>();
     if (appContext) {
-        auto gameManager = appContext->getGameManager();
-        if (gameManager) {
-            serverId = gameManager->getServerId();
+        auto tcpServer = appContext->getTcpServer();
+        if (tcpServer) {
+            machineId = tcpServer->getServerNumericId();
+            // 确保machineId在10位以内 (0-1023)
+            machineId &= 0x3FF;
         }
     }
     
-    size_t underscorePos = serverId.find_last_of('_');
-    if (underscorePos != std::string::npos && underscorePos + 1 < serverId.length()) {
-        serverIdNum = serverId.substr(underscorePos + 1);
-    }
-    
-    std::stringstream serverIdStream;
-    try {
-        int serverIdInt = std::stoi(serverIdNum);
-        serverIdStream << std::setfill('0') << std::setw(4) << serverIdInt;
-    } catch (const std::exception& e) {
-        serverIdStream << "0001";
-    }
-    std::string serverIdPart = serverIdStream.str();
-    
     auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-    auto tm = *std::localtime(&time_t);
+    uint64_t timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
     
-    std::stringstream timeStream;
-    timeStream << std::setfill('0') 
-               << std::setw(2) << (tm.tm_year % 100)  // 年份取后2位
-               << std::setw(2) << (tm.tm_mon + 1)      
-               << std::setw(2) << tm.tm_mday 
-               << std::setw(2) << tm.tm_hour
-               << std::setw(2) << tm.tm_min 
-               << std::setw(2) << tm.tm_sec; 
-    std::string timePart = timeStream.str();
+    uint64_t seq = sequence.fetch_add(1) & 0xFFF; // 12位序列号
+    uint64_t snowflakeId = ((timestamp - EPOCH) << 22) | (machineId << 12) | seq;
     
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(10000, 99999);
-    int randomNum = dis(gen);
-    
+    // 使用游戏类型ID作为前缀
     std::stringstream ss;
-    ss << gameTypePart << serverIdPart << timePart << randomNum;
+    ss << std::setfill('0') << std::setw(4) << gameTypeId << snowflakeId;
     
     std::string roundId = ss.str();
-    LOG_INFO("Generated roundId: %s for game type: %s", roundId.c_str(), gameType.c_str());
+    LOG_INFO("Generated roundId: %s for game type: %s", roundId.c_str(), gameType_.c_str());
     return roundId;
-}
-
-std::string IGame::generateBetId() {
-    // 生成随机下注ID
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(0, 255);
-    
-    std::stringstream ss;
-    ss << "bet-";
-    for (int i = 0; i < 16; i++) {
-        ss << std::setw(2) << std::setfill('0') << std::hex << dis(gen);
-    }
-    
-    return ss.str();
 }
 
 int IGame::getGameTypeId(const std::string& gameType) {
@@ -230,8 +190,6 @@ bool IGame::compareAndSwapStatus(GameStatus expected, GameStatus desired) {
     return success;
 }
 
-// ========== 玩家管理方法实现 ==========
-
 void IGame::clearPlayers() {
     std::unique_lock<std::shared_mutex> lock(playersMutex_);  // 写锁
     players_.clear();
@@ -252,4 +210,61 @@ std::shared_ptr<PlayerInGame> IGame::getPlayer(const std::string& loginname) con
     std::shared_lock<std::shared_mutex> lock(playersMutex_);  // 读锁
     auto it = players_.find(loginname);
     return (it != players_.end()) ? it->second : nullptr;
+}
+
+std::string IGame::generateOrderId() {
+    // 雪花算法: 1位符号位(0) + 41位时间戳 + 10位机器ID + 12位序列号
+    static std::atomic<uint64_t> sequence{0};
+    static const uint64_t EPOCH = 1640995200000; // 2022-01-01 00:00:00 UTC
+    
+    // 获取服务器ID作为机器ID
+    uint64_t machineId = 1; // 默认值
+    
+    // 从依赖容器获取AppContext
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (appContext) {
+        auto tcpServer = appContext->getTcpServer();
+        if (tcpServer) {
+            machineId = tcpServer->getServerNumericId();
+            // 确保machineId在10位以内 (0-1023)
+            machineId &= 0x3FF;
+        }
+    }
+    
+    auto now = std::chrono::system_clock::now();
+    uint64_t timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    
+    uint64_t seq = sequence.fetch_add(1) & 0xFFF; // 12位序列号
+    uint64_t snowflakeId = ((timestamp - EPOCH) << 22) | (machineId << 12) | seq;
+    
+    return "ORD" + std::to_string(snowflakeId);
+}
+
+std::string IGame::generateTransId() {
+    static std::atomic<uint64_t> sequence{0};
+    static const uint64_t EPOCH = 1640995200000;
+    
+    // 获取服务器ID作为机器ID
+    uint64_t machineId = 1; // 默认值
+    
+    // 从依赖容器获取AppContext
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (appContext) {
+        auto tcpServer = appContext->getTcpServer();
+        if (tcpServer) {
+            machineId = tcpServer->getServerNumericId();
+            // 确保machineId在10位以内 (0-1023)
+            machineId &= 0x3FF;
+        }
+    }
+    
+    auto now = std::chrono::system_clock::now();
+    uint64_t timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    
+    uint64_t seq = sequence.fetch_add(1) & 0xFFF;
+    uint64_t snowflakeId = ((timestamp - EPOCH) << 22) | (machineId << 12) | seq;
+    
+    return "TXN" + std::to_string(snowflakeId);
 }

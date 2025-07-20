@@ -15,16 +15,7 @@ extern DependencyContainer& getDependencyContainer();
 using json = nlohmann::json;
 
 MinesFactory::MinesFactory() {
-    auto& container = getDependencyContainer();
-    auto appContext = container.resolve<AppContext>();
-    auto dbFactory = container.resolve<DatabaseFactory>();
-    
-    if (!appContext || !dbFactory) {
-        LOG_ERROR("Failed to resolve dependencies for MinesFactory");
-        return;
-    }
-    
-    auto minesGameService = std::make_shared<MinesGameService>(this, appContext, dbFactory);
+    auto minesGameService = std::make_shared<MinesGameService>(this);
     gameService_ = minesGameService;
 }
 

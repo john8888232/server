@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include <memory>
 #include <mutex>
-#include <shared_mutex>
 #include <functional>
 #include "third_party/libuv_cpp/include/uv11.hpp"
 #include "../common/utils.h"
@@ -71,13 +70,6 @@ public:
     void stopSessionCleanupTimer();
     
 private:
-    // 锁分片，默认使用16个分片
-    ShardedMutex<16> gatewayMutex_;
-    ShardedMutex<32> playerSessionMutex_;
-    
-    // 回调和配置锁
-    mutable std::shared_mutex configMutex_;
-    
     // Gateway连接映射: gatewayId(连接地址) -> GatewayConnection
     std::unordered_map<std::string, std::shared_ptr<GatewayConnection>> gateways_;
     
@@ -89,6 +81,11 @@ private:
     
     // 反向映射: gatewayId -> playerSessionIds
     std::unordered_map<std::string, std::vector<std::string>> gatewayPlayerSessions_;
+    
+    // 使用分片互斥量替代单一互斥量
+    ShardedMutex<32> playerMutex_;    // 玩家分片锁，32个分片
+    ShardedMutex<8> gatewayMutex_;    // Gateway分片锁，8个分片
+    mutable std::shared_mutex globalMutex_;  // 全局操作使用的互斥量
     
     // 消息发送回调（由TcpServer注入）
     SendMessageCallback sendMessageCallback_;

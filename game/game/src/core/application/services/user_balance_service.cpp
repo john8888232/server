@@ -1,9 +1,16 @@
 #include "user_balance_service.h"
 #include <third_party/libuv_cpp/include/LogWriter.hpp>
 #include "core/infrastructure/repositories/user_balance_repository_impl.h"
+#include "core/infrastructure/common/dependency_container.h"
 
-UserBalanceService::UserBalanceService(std::shared_ptr<DatabaseFactory> dbFactory)
-    : repository_(std::make_shared<UserBalanceRepositoryImpl>(dbFactory)) {
+extern DependencyContainer& getDependencyContainer();
+
+UserBalanceService::UserBalanceService() {
+    repository_ = std::make_shared<UserBalanceRepositoryImpl>();
+    
+    if (!repository_) {
+        LOG_ERROR("Failed to create UserBalanceRepositoryImpl");
+    }
 }
 
 UserBalanceService::UserBalanceService(std::shared_ptr<IUserBalanceRepository> repository)

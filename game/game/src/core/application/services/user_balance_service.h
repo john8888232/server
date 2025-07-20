@@ -10,8 +10,8 @@
 // 用户余额服务 - 应用层服务，处理与用户余额相关的业务逻辑
 class UserBalanceService {
 public:
-    // 构造函数 - 默认创建UserBalanceRepositoryImpl作为仓库实现
-    UserBalanceService(std::shared_ptr<DatabaseFactory> dbFactory);
+    // 默认构造函数 - 从依赖容器获取依赖
+    UserBalanceService();
     
     // 构造函数 - 使用指定的仓库实现
     explicit UserBalanceService(std::shared_ptr<IUserBalanceRepository> repository);

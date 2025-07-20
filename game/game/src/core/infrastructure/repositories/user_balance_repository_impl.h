@@ -6,11 +6,10 @@
 #include "core/domain/repositories/i_user_balance_repository.h"
 #include "core/infrastructure/persistence/database_factory.h"
 
-// 用户余额仓库MySQL实现
+// 用户余额仓库实现
 class UserBalanceRepositoryImpl : public IUserBalanceRepository {
 public:
-    // 构造函数 - 接收DatabaseFactory依赖
-    explicit UserBalanceRepositoryImpl(std::shared_ptr<DatabaseFactory> dbFactory);
+    UserBalanceRepositoryImpl();
     
     ~UserBalanceRepositoryImpl() override;
     

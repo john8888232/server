@@ -16,7 +16,7 @@ bool MySQLClient::initialize(const ConfigManager& configManager) {
         password_ = configManager.getServerConfig()["database"]["mysql"]["password"];
         database_ = configManager.getServerConfig()["database"]["mysql"]["database"];
         max_connections_ = configManager.getServerConfig()["database"]["mysql"]["max_connections"].get<unsigned int>();
-        LOG_DEBUG("MySQL client initialized");
+        ssl_mode_ = configManager.getServerConfig()["database"]["mysql"]["ssl_mode"];
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR("Error initializing MySQL client: %s", e.what());
@@ -55,6 +55,24 @@ bool MySQLClient::connect() {
 std::shared_ptr<mysqlx::Session> MySQLClient::createSession() {
     try {
         mysqlx::SessionSettings session_settings(host_, port_, user_, password_, database_);
+        
+        // 根据配置设置SSL模式
+        if (ssl_mode_ == "DISABLED") {
+            session_settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::DISABLED);
+            LOG_DEBUG("MySQL SSL mode set to DISABLED");
+        } else if (ssl_mode_ == "REQUIRED") {
+            session_settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::REQUIRED);
+            LOG_DEBUG("MySQL SSL mode set to REQUIRED");
+        } else if (ssl_mode_ == "VERIFY_CA") {
+            session_settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::VERIFY_CA);
+            LOG_DEBUG("MySQL SSL mode set to VERIFY_CA");
+        } else if (ssl_mode_ == "VERIFY_IDENTITY") {
+            session_settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::VERIFY_IDENTITY);
+            LOG_DEBUG("MySQL SSL mode set to VERIFY_IDENTITY");
+        } else {
+            session_settings.set(mysqlx::SessionOption::SSL_MODE, mysqlx::SSLMode::REQUIRED);
+            LOG_DEBUG("MySQL SSL mode set to default (REQUIRED)");
+        }
         std::shared_ptr<mysqlx::Session> session = std::make_shared<mysqlx::Session>(session_settings);
         return session;
     } catch (const mysqlx::Error& e) {

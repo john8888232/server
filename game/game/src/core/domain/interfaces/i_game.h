@@ -98,9 +98,9 @@ public:
     // 获取指定玩家
     virtual std::shared_ptr<PlayerInGame> getPlayer(const std::string& loginname) const;
     
-    // 生成局号和订单号
-    static std::string generateRoundId(const std::string& gameType);
-    static std::string generateBetId();
+    std::string generateRoundId();    // 生成局号
+    std::string generateOrderId();    // 生成订单ID
+    std::string generateTransId();    // 生成交易ID
     
 protected:
     std::unordered_map<std::string, std::shared_ptr<PlayerInGame>> players_; // key - loginname

@@ -1207,13 +1207,18 @@ class HeartBeat final :
   enum : int {
     kTimestampFieldNumber = 1,
   };
-  // int64 timestamp = 1;
+  // string timestamp = 1;
   void clear_timestamp();
-  int64_t timestamp() const;
-  void set_timestamp(int64_t value);
+  const std::string& timestamp() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_timestamp(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_timestamp();
+  PROTOBUF_NODISCARD std::string* release_timestamp();
+  void set_allocated_timestamp(std::string* timestamp);
   private:
-  int64_t _internal_timestamp() const;
-  void _internal_set_timestamp(int64_t value);
+  const std::string& _internal_timestamp() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_timestamp(const std::string& value);
+  std::string* _internal_mutable_timestamp();
   public:
 
   // @@protoc_insertion_point(class_scope:proto.HeartBeat)
@@ -1224,7 +1229,7 @@ class HeartBeat final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   struct Impl_ {
-    int64_t timestamp_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr timestamp_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -2265,10 +2270,10 @@ class GameSnapshotNotify final :
     kResultFieldNumber = 7,
     kRoundIdFieldNumber = 1,
     kGameTypeFieldNumber = 2,
-    kRemainTimeFieldNumber = 4,
     kStatusFieldNumber = 3,
-    kCurIndexFieldNumber = 5,
+    kRemainTimeFieldNumber = 4,
     kCurMultiFieldNumber = 6,
+    kCurIndexFieldNumber = 5,
   };
   // repeated .proto.GameResult result = 7;
   int result_size() const;
@@ -2316,15 +2321,6 @@ class GameSnapshotNotify final :
   std::string* _internal_mutable_gametype();
   public:
 
-  // int64 remainTime = 4;
-  void clear_remaintime();
-  int64_t remaintime() const;
-  void set_remaintime(int64_t value);
-  private:
-  int64_t _internal_remaintime() const;
-  void _internal_set_remaintime(int64_t value);
-  public:
-
   // int32 status = 3;
   void clear_status();
   int32_t status() const;
@@ -2334,13 +2330,13 @@ class GameSnapshotNotify final :
   void _internal_set_status(int32_t value);
   public:
 
-  // int32 curIndex = 5;
-  void clear_curindex();
-  int32_t curindex() const;
-  void set_curindex(int32_t value);
+  // int32 remainTime = 4;
+  void clear_remaintime();
+  int32_t remaintime() const;
+  void set_remaintime(int32_t value);
   private:
-  int32_t _internal_curindex() const;
-  void _internal_set_curindex(int32_t value);
+  int32_t _internal_remaintime() const;
+  void _internal_set_remaintime(int32_t value);
   public:
 
   // double curMulti = 6;
@@ -2350,6 +2346,15 @@ class GameSnapshotNotify final :
   private:
   double _internal_curmulti() const;
   void _internal_set_curmulti(double value);
+  public:
+
+  // int32 curIndex = 5;
+  void clear_curindex();
+  int32_t curindex() const;
+  void set_curindex(int32_t value);
+  private:
+  int32_t _internal_curindex() const;
+  void _internal_set_curindex(int32_t value);
   public:
 
   // @@protoc_insertion_point(class_scope:proto.GameSnapshotNotify)
@@ -2363,10 +2368,10 @@ class GameSnapshotNotify final :
     ::PROTOBUF_NAMESPACE_ID::RepeatedPtrField< ::proto::GameResult > result_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr roundid_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr gametype_;
-    int64_t remaintime_;
     int32_t status_;
-    int32_t curindex_;
+    int32_t remaintime_;
     double curmulti_;
+    int32_t curindex_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -4139,13 +4144,13 @@ class MinesStartJettonNotify final :
   std::string* _internal_mutable_gametype();
   public:
 
-  // int64 duration = 3;
+  // int32 duration = 3;
   void clear_duration();
-  int64_t duration() const;
-  void set_duration(int64_t value);
+  int32_t duration() const;
+  void set_duration(int32_t value);
   private:
-  int64_t _internal_duration() const;
-  void _internal_set_duration(int64_t value);
+  int32_t _internal_duration() const;
+  void _internal_set_duration(int32_t value);
   public:
 
   // @@protoc_insertion_point(class_scope:proto.MinesStartJettonNotify)
@@ -4158,7 +4163,7 @@ class MinesStartJettonNotify final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr roundid_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr gametype_;
-    int64_t duration_;
+    int32_t duration_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -4289,7 +4294,6 @@ class GameStopJettonNotify final :
   enum : int {
     kRoundIdFieldNumber = 1,
     kGameTypeFieldNumber = 2,
-    kStopTimeFieldNumber = 3,
   };
   // string roundId = 1;
   void clear_roundid();
@@ -4319,15 +4323,6 @@ class GameStopJettonNotify final :
   std::string* _internal_mutable_gametype();
   public:
 
-  // int64 stopTime = 3;
-  void clear_stoptime();
-  int64_t stoptime() const;
-  void set_stoptime(int64_t value);
-  private:
-  int64_t _internal_stoptime() const;
-  void _internal_set_stoptime(int64_t value);
-  public:
-
   // @@protoc_insertion_point(class_scope:proto.GameStopJettonNotify)
  private:
   class _Internal;
@@ -4338,7 +4333,6 @@ class GameStopJettonNotify final :
   struct Impl_ {
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr roundid_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr gametype_;
-    int64_t stoptime_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -5302,24 +5296,54 @@ inline void GameResult::set_index(int32_t value) {
 
 // HeartBeat
 
-// int64 timestamp = 1;
+// string timestamp = 1;
 inline void HeartBeat::clear_timestamp() {
-  _impl_.timestamp_ = int64_t{0};
+  _impl_.timestamp_.ClearToEmpty();
 }
-inline int64_t HeartBeat::_internal_timestamp() const {
-  return _impl_.timestamp_;
-}
-inline int64_t HeartBeat::timestamp() const {
+inline const std::string& HeartBeat::timestamp() const {
   // @@protoc_insertion_point(field_get:proto.HeartBeat.timestamp)
   return _internal_timestamp();
 }
-inline void HeartBeat::_internal_set_timestamp(int64_t value) {
-  
-  _impl_.timestamp_ = value;
-}
-inline void HeartBeat::set_timestamp(int64_t value) {
-  _internal_set_timestamp(value);
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void HeartBeat::set_timestamp(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.timestamp_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
   // @@protoc_insertion_point(field_set:proto.HeartBeat.timestamp)
+}
+inline std::string* HeartBeat::mutable_timestamp() {
+  std::string* _s = _internal_mutable_timestamp();
+  // @@protoc_insertion_point(field_mutable:proto.HeartBeat.timestamp)
+  return _s;
+}
+inline const std::string& HeartBeat::_internal_timestamp() const {
+  return _impl_.timestamp_.Get();
+}
+inline void HeartBeat::_internal_set_timestamp(const std::string& value) {
+  
+  _impl_.timestamp_.Set(value, GetArenaForAllocation());
+}
+inline std::string* HeartBeat::_internal_mutable_timestamp() {
+  
+  return _impl_.timestamp_.Mutable(GetArenaForAllocation());
+}
+inline std::string* HeartBeat::release_timestamp() {
+  // @@protoc_insertion_point(field_release:proto.HeartBeat.timestamp)
+  return _impl_.timestamp_.Release();
+}
+inline void HeartBeat::set_allocated_timestamp(std::string* timestamp) {
+  if (timestamp != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.timestamp_.SetAllocated(timestamp, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.timestamp_.IsDefault()) {
+    _impl_.timestamp_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:proto.HeartBeat.timestamp)
 }
 
 // -------------------------------------------------------------------
@@ -6136,22 +6160,22 @@ inline void GameSnapshotNotify::set_status(int32_t value) {
   // @@protoc_insertion_point(field_set:proto.GameSnapshotNotify.status)
 }
 
-// int64 remainTime = 4;
+// int32 remainTime = 4;
 inline void GameSnapshotNotify::clear_remaintime() {
-  _impl_.remaintime_ = int64_t{0};
+  _impl_.remaintime_ = 0;
 }
-inline int64_t GameSnapshotNotify::_internal_remaintime() const {
+inline int32_t GameSnapshotNotify::_internal_remaintime() const {
   return _impl_.remaintime_;
 }
-inline int64_t GameSnapshotNotify::remaintime() const {
+inline int32_t GameSnapshotNotify::remaintime() const {
   // @@protoc_insertion_point(field_get:proto.GameSnapshotNotify.remainTime)
   return _internal_remaintime();
 }
-inline void GameSnapshotNotify::_internal_set_remaintime(int64_t value) {
+inline void GameSnapshotNotify::_internal_set_remaintime(int32_t value) {
   
   _impl_.remaintime_ = value;
 }
-inline void GameSnapshotNotify::set_remaintime(int64_t value) {
+inline void GameSnapshotNotify::set_remaintime(int32_t value) {
   _internal_set_remaintime(value);
   // @@protoc_insertion_point(field_set:proto.GameSnapshotNotify.remainTime)
 }
@@ -7752,22 +7776,22 @@ inline void MinesStartJettonNotify::set_allocated_gametype(std::string* gametype
   // @@protoc_insertion_point(field_set_allocated:proto.MinesStartJettonNotify.gametype)
 }
 
-// int64 duration = 3;
+// int32 duration = 3;
 inline void MinesStartJettonNotify::clear_duration() {
-  _impl_.duration_ = int64_t{0};
+  _impl_.duration_ = 0;
 }
-inline int64_t MinesStartJettonNotify::_internal_duration() const {
+inline int32_t MinesStartJettonNotify::_internal_duration() const {
   return _impl_.duration_;
 }
-inline int64_t MinesStartJettonNotify::duration() const {
+inline int32_t MinesStartJettonNotify::duration() const {
   // @@protoc_insertion_point(field_get:proto.MinesStartJettonNotify.duration)
   return _internal_duration();
 }
-inline void MinesStartJettonNotify::_internal_set_duration(int64_t value) {
+inline void MinesStartJettonNotify::_internal_set_duration(int32_t value) {
   
   _impl_.duration_ = value;
 }
-inline void MinesStartJettonNotify::set_duration(int64_t value) {
+inline void MinesStartJettonNotify::set_duration(int32_t value) {
   _internal_set_duration(value);
   // @@protoc_insertion_point(field_set:proto.MinesStartJettonNotify.duration)
 }
@@ -7874,26 +7898,6 @@ inline void GameStopJettonNotify::set_allocated_gametype(std::string* gametype) 
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:proto.GameStopJettonNotify.gameType)
-}
-
-// int64 stopTime = 3;
-inline void GameStopJettonNotify::clear_stoptime() {
-  _impl_.stoptime_ = int64_t{0};
-}
-inline int64_t GameStopJettonNotify::_internal_stoptime() const {
-  return _impl_.stoptime_;
-}
-inline int64_t GameStopJettonNotify::stoptime() const {
-  // @@protoc_insertion_point(field_get:proto.GameStopJettonNotify.stopTime)
-  return _internal_stoptime();
-}
-inline void GameStopJettonNotify::_internal_set_stoptime(int64_t value) {
-  
-  _impl_.stoptime_ = value;
-}
-inline void GameStopJettonNotify::set_stoptime(int64_t value) {
-  _internal_set_stoptime(value);
-  // @@protoc_insertion_point(field_set:proto.GameStopJettonNotify.stopTime)
 }
 
 // -------------------------------------------------------------------

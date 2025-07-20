@@ -10,16 +10,32 @@
 #include "core/infrastructure/common/utils.h"
 #include "core/infrastructure/persistence/database_factory.h"
 #include "games/game_def.h"
-#include <core/infrastructure/common/error_code.h>
+#include "core/infrastructure/common/error_code.h"
 #include <mutex>
+#include "core/infrastructure/common/dependency_container.h"
+
+extern DependencyContainer& getDependencyContainer();
 
 using json = nlohmann::json;
 
-MinesGame::MinesGame(std::shared_ptr<AppContext> appContext, std::shared_ptr<DatabaseFactory> dbFactory) 
+MinesGame::MinesGame() 
     : minesCount_(3), totalTiles_(24), eventLoop_(nullptr), 
       tickCounter_(0), stateTransitionTarget_(-1), targetStatus_(GameStatus::INIT),
-      minBet_(10.00), maxBet_(8000.00), maxWinPerRound_(800000.00),
-      appContext_(appContext), dbFactory_(dbFactory) {
+      minBet_(10.00), maxBet_(8000.00), maxWinPerRound_(800000.00) {
+    
+    // 从依赖容器获取依赖
+    auto& container = getDependencyContainer();
+    appContext_ = container.resolve<AppContext>();
+    dbFactory_ = container.resolve<DatabaseFactory>();
+    
+    if (!appContext_) {
+        LOG_ERROR("Failed to resolve AppContext from dependency container");
+    }
+    
+    if (!dbFactory_) {
+        LOG_ERROR("Failed to resolve DatabaseFactory from dependency container");
+    }
+    
     grid_ = std::make_shared<MinesGrid>();
     setStatus(GameStatus::INIT);  // 使用封装的方法
     gameType_ = "mines_pro";  // 设置游戏类型
@@ -28,8 +44,8 @@ MinesGame::MinesGame(std::shared_ptr<AppContext> appContext, std::shared_ptr<Dat
         eventLoop_ = appContext_->getEventLoop();
     }
     
-    // 初始化用户余额服务
-    userBalanceService_ = std::make_shared<UserBalanceService>(dbFactory_);
+    // 初始化用户余额服务，使用无参构造函数
+    userBalanceService_ = std::make_shared<UserBalanceService>();
 }
 
 MinesGame::~MinesGame() {
@@ -276,12 +292,12 @@ bool MinesGame::start() {
         return false;
     }
     
-    roundID_ = IGame::generateRoundId(gameType_);
+    roundID_ = generateRoundId();
     generateGameGrid();
     startTime_ = std::chrono::system_clock::now();
     initializeRankInfo();
     
-    //broadcastStatusNotify(GameStatus::START_JETTON);
+    broadcastStatusNotify(GameStatus::START_JETTON);
     broadcastStartJettonNotify(); // 添加专用的开始下注通知
     
     tickCounter_ = 0;
@@ -300,7 +316,7 @@ void MinesGame::stop() {
 void MinesGame::onStartJettonComplete() {
     GameStatus expected = GameStatus::START_JETTON;
     if (compareAndSwapStatus(expected, GameStatus::STOP_JETTON)) {
-        //broadcastStatusNotify(GameStatus::STOP_JETTON);
+        broadcastStatusNotify(GameStatus::STOP_JETTON);
         broadcastStopJettonNotify(); // 添加专用的停止下注通知
     } else {
         LOG_WARN("Failed to transition from START_JETTON to STOP_JETTON, current status: %d", 
@@ -325,10 +341,9 @@ void MinesGame::enterSettledState() {
 }
 
 void MinesGame::startNewRound() {
-    roundID_ = IGame::generateRoundId(gameType_);
+    roundID_ = generateRoundId();
     generateGameGrid();
     initializeRankInfo();
-    
     {
         std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
         resetAllPlayersCashOutStatus();
@@ -336,7 +351,7 @@ void MinesGame::startNewRound() {
     
     startTime_ = std::chrono::system_clock::now();
     setStatus(GameStatus::START_JETTON);
-    //broadcastStatusNotify(GameStatus::START_JETTON);
+    broadcastStatusNotify(GameStatus::START_JETTON);
     broadcastStartJettonNotify(); // 添加专用的开始下注通知
     
     tickCounter_ = 0;
@@ -426,20 +441,20 @@ void MinesGame::initializeWithConfig(const json& config) {
     gameConfig_ = config;
     
     // 解析基本游戏规则
-    if (config.contains("rules")) {
-        const auto& rules = config["rules"];
+        if (config.contains("rules")) {
+            const auto& rules = config["rules"];
         
         if (rules.contains("betting_time")) {
             bettingTime_ = rules["betting_time"].get<uint32_t>();
         }
-        
-        if (rules.contains("mines_count")) {
+            
+            if (rules.contains("mines_count")) {
             minesCount_ = rules["mines_count"].get<uint32_t>();
-        }
-        
-        if (rules.contains("grid_size")) {
+            }
+            
+            if (rules.contains("grid_size")) {
             totalTiles_ = rules["grid_size"].get<uint32_t>();
-        }
+            }
     }
     
     // 解析下注限制和最大赔付配置
@@ -456,21 +471,21 @@ void MinesGame::initializeWithConfig(const json& config) {
         
         if (betting.contains("max_win_per_round")) {
             maxWinPerRound_ = betting["max_win_per_round"].get<double>();
+            }
         }
-    }
         
     // 解析倍数配置
     tileConfigs_.clear();
-    if (config.contains("multipliers")) {
-        const auto& multipliers = config["multipliers"];
+        if (config.contains("multipliers")) {
+            const auto& multipliers = config["multipliers"];
         
         for (uint32_t i = 1; i <= totalTiles_; ++i) {
-            std::string key = std::to_string(i);
-            if (multipliers.contains(key) && multipliers[key].is_array() && multipliers[key].size() >= 2) {
+                std::string key = std::to_string(i);
+                if (multipliers.contains(key) && multipliers[key].is_array() && multipliers[key].size() >= 2) {
                 double multi = multipliers[key][0].get<double>();
-                double weight = multipliers[key][1].get<double>();
+                    double weight = multipliers[key][1].get<double>();
                 tileConfigs_.push_back(std::make_pair(multi, weight));
-            } else {
+                } else {
                 tileConfigs_.push_back(std::make_pair(0.0, 0.0));
             }
         }

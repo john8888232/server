@@ -5,7 +5,10 @@
 #include <vector>
 #include <memory>
 #include <mutex>
-#include <mysql-cppconn/mysqlx/xdevapi.h>
+#include <variant>
+#include <optional>
+#include <functional>
+#include <mysqlx/xdevapi.h>
 #include "mysql_data_def.h"
 #include "../common/config_manager.h"
 
@@ -70,6 +73,7 @@ private:
     std::string password_;
     std::string database_;
     unsigned int max_connections_;
+    std::string ssl_mode_; // 添加SSL模式配置
     
     // MySQL连接池
     std::vector<std::shared_ptr<mysqlx::Session>> session_pool_;

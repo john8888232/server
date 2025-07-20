@@ -4,17 +4,12 @@
 #include <memory>
 #include <string>
 #include <functional>
-#include <unordered_map>
-#include <mutex>
-#include <set>
-#include "third_party/libuv_cpp/include/uv11.hpp"
+
 #include "../common/config_manager.h"
 #include "../common/session_thread_pool.h"
-#include "../common/utils.h"
 #include "../../interfaces/message_router.h"
 #include "connection_manager.h"
-#include "protocol.h"
-#include "core/domain/models/user.h"
+
 
 // 数据包校验结果
 enum class PacketValidationResult {
@@ -67,7 +62,13 @@ public:
     
     // 设置消息路由器 - 使用shared_ptr替代裸指针
     void setMessageRouter(std::shared_ptr<MessageRouter> router);
-
+    
+    // 获取服务器ID
+    const std::string& getServerId() const { return serverId_; }
+    
+    // 获取服务器数字ID（从服务器ID中提取的数字部分）
+    uint64_t getServerNumericId() const { return serverNumericId_; }
+ 
 private:
     // 内部方法 - 连接管理
     void onNewConnection(std::weak_ptr<uv::TcpConnection> connection);
@@ -82,26 +83,26 @@ private:
     
     // 将已验证的包投入按sessionID分配的线程池处理
     void enqueuePacket(std::shared_ptr<uv::TcpConnection> connection, 
-                              uv::Packet packet, const std::string& gatewayId);
+                               uv::Packet packet, const std::string& gatewayId);
     
     // 在线程池中处理已验证的数据包
     void processPacket(std::shared_ptr<uv::TcpConnection> connection, 
-                                     uv::Packet packet, const std::string& gatewayId);
+                                      uv::Packet packet, const std::string& gatewayId);
     
     // 内部发送消息方法
     bool sendMessageToConnection(std::weak_ptr<uv::TcpConnection> connection, 
-                                uint32_t msgId, const std::string& data, 
-                                const std::string& sessionId);
+                                 uint32_t msgId, const std::string& data, 
+                                 const std::string& sessionId);
     
     // 同步发送响应（在当前线程中）
     void sendResponse(std::shared_ptr<uv::TcpConnection> connection, 
-                     std::shared_ptr<uv::Packet> responsePacket, const std::string& type);
+                      std::shared_ptr<uv::Packet> responsePacket, const std::string& type);
     
     // 异步发送响应（确保在事件循环线程中执行）
     void sendResponseAsync(std::shared_ptr<uv::TcpConnection> connection, 
-                           std::shared_ptr<uv::Packet> responsePacket, 
-                           const std::string& type);
-
+                            std::shared_ptr<uv::Packet> responsePacket, 
+                            const std::string& type);
+ 
 private:
     uv::EventLoop* loop_;
     std::unique_ptr<uv::TcpServer> server_;
@@ -113,6 +114,8 @@ private:
     unsigned short port_;
     size_t threadPoolSize_;
     size_t maxQueueSizePerWorker_;  // 每个工作线程的最大队列大小
+    std::string serverId_;          // 服务器ID
+    uint64_t serverNumericId_;      // 服务器数字ID
     
     // 回调函数
     OnConnectionCallback onConnectionCallback_;

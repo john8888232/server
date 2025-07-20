@@ -3,6 +3,9 @@
 #include <cmath>
 #include "core/infrastructure/persistence/database_factory.h"
 #include "core/infrastructure/persistence/mysql_client.h"
+#include "core/infrastructure/common/dependency_container.h"
+
+extern DependencyContainer& getDependencyContainer();
 
 // 小数精度误差容忍范围 - 增大以处理浮点数精度问题
 constexpr double DECIMAL_EPSILON = 0.01;
@@ -12,9 +15,14 @@ double roundToTwoDecimals(double value) {
     return std::round(value * 100.0) / 100.0;
 }
 
-UserBalanceRepositoryImpl::UserBalanceRepositoryImpl(std::shared_ptr<DatabaseFactory> dbFactory)
-    : dbFactory_(dbFactory) {
-    // MySQL实现特定的初始化
+UserBalanceRepositoryImpl::UserBalanceRepositoryImpl() {
+    // 从依赖容器获取DatabaseFactory
+    auto& container = getDependencyContainer();
+    dbFactory_ = container.resolve<DatabaseFactory>();
+    
+    if (!dbFactory_) {
+        LOG_ERROR("Failed to resolve DatabaseFactory from dependency container");
+    }
 }
 
 UserBalanceRepositoryImpl::~UserBalanceRepositoryImpl() {

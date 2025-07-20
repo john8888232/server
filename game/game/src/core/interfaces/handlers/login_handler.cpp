@@ -42,7 +42,6 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
         proto::LoginResp response;
         response.set_loginname(request.loginname());
         
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
@@ -89,7 +88,6 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
                 LOG_WARN("Login failed for %s: %s (code: %d)", 
                          request.loginname().c_str(), loginResult.errorMessage.c_str(), loginResult.errorCode);
                 
-                // 发送失败响应并清理会话
                 std::string responseData;
                 if (response.SerializeToString(&responseData)) {
                     responseCallback_(sessionId, Protocol::SC_LOGIN_RES, responseData);
@@ -122,15 +120,14 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
             }
         }
         
-        // 构建成功响应
         response.set_code(ErrorCode::SUCCESS);
         response.set_message(ErrorCode::getErrorMessage(ErrorCode::SUCCESS));
         auto playerInfo = response.mutable_info();
         playerInfo->set_username(finalUser->getUserName());
-        playerInfo->set_loginname(finalUser->getLoginName());  // 设置登录名
+        playerInfo->set_loginname(finalUser->getLoginName()); 
         playerInfo->set_nickname(finalUser->getNickName());
         playerInfo->set_avatar(finalUser->getAvatar());
-        playerInfo->set_balance(finalUser->getBalance()); // 使用游戏中的余额或数据库余额
+        playerInfo->set_balance(finalUser->getBalance()); 
         playerInfo->set_currency(finalUser->getCurrency());
             
         bool completed = tcpServer_->getConnectionManager()->completePlayerSession(

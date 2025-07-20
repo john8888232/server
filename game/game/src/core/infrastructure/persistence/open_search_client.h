@@ -9,7 +9,6 @@
 #include <json/json.h>
 #include "../common/config_manager.h"
 
-// 前向声明，避免包含完整的AWS SDK头文件
 namespace Aws {
     class SDKOptions;
     namespace Auth {

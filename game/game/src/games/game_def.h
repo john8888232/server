@@ -23,6 +23,13 @@ namespace MinesProPlayType {
         return playType == LEFT || playType == RIGHT;
     }
 }
+// 交易原因常量
+namespace TransactionReason {
+    constexpr const char* BET = "BET";           // 下注
+    constexpr const char* RECKON = "RECKON";     // 派彩
+    constexpr const char* BRING_IN = "BRING_IN"; // 带入
+    constexpr const char* BRING_OUT = "BRING_OUT"; // 带出
+}
 
 // 游戏类型到ID的映射
 inline const std::unordered_map<std::string, int> GAME_TYPE_TO_ID = {
