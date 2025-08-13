@@ -1,19 +1,22 @@
 #include "consul_client.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <cstring>
+#include <chrono>
 
 using namespace ppconsul;
 
-ConsulClient::ConsulClient(uv::EventLoop* loop) : loop_(loop) {}
+ConsulClient::ConsulClient(uv::EventLoop* loop) 
+    : loop_(loop) {}
 
 ConsulClient::~ConsulClient() {
     if (initialized_) {
         stopHealthCheck();
-        // 注意：不在析构函数中调用deregisterService()
-        // 因为这会导致重复注销（AppContext::destroyComponents()中已经调用过了）
+        // 设置标志防止正在执行的任务继续访问成员变量
+        initialized_ = false;
+        // 不等待WorkerThread停止，让其析构函数处理
     }
 }
 
@@ -42,6 +45,14 @@ bool ConsulClient::initialize(const ConfigManager& configManager) {
         }
         
         agent_ = std::make_unique<agent::Agent>(*consul_);
+        
+        // 创建并启动ThreadWrapper，设置2秒超时警告
+        workerThread_ = std::make_unique<ThreadWrapper>(100, 2000);
+        if (!workerThread_->start()) {
+            LOG_ERROR("Failed to start consul worker thread");
+            return false;
+        }
+        
         initialized_ = true;
         return true;
     } catch (const std::exception& e) {
@@ -101,42 +112,60 @@ bool ConsulClient::startHealthCheck() {
         return false;
     }
     
-    if (isRunningHealthCheck_) {
+    if (!workerThread_ || !workerThread_->isRunning()) {
+        LOG_ERROR("Worker thread not available or not running");
+        return false;
+    }
+    
+    if (isRunningHealthCheck_.load()) {
         LOG_INFO("Health check is already running");
         return true;
     }
     
     try {
-        int timerIntervalMs = (healthCheckInterval_ * 1000) / 2;
+        // 设置报告间隔为TTL的1/3，确保有足够的安全边际
+        int timerIntervalMs = (healthCheckInterval_ * 1000) / 3;
         
         healthCheckTimer_ = std::make_shared<uv::Timer>(loop_, timerIntervalMs, timerIntervalMs, 
             [this](uv::Timer* timer) {
-                this->onHealthCheckTimer();
+                // 在定时器回调中快速检查状态，然后投递到工作线程
+                if (isRunningHealthCheck_.load() && initialized_ && workerThread_ && workerThread_->isRunning()) {
+                    workerThread_->postTask([this]() {
+                        if (isRunningHealthCheck_.load() && initialized_) {
+                            this->reportHealth(true);
+                        }
+                    }, ThreadWrapper::Priority::NORMAL);
+                }
             });
         
         healthCheckTimer_->start();
-        
-        isRunningHealthCheck_ = true;
+        isRunningHealthCheck_.store(true);
         LOG_INFO("Health check timer started with interval %d ms", timerIntervalMs);
-        
-        return reportHealth();
+        return true;
     } catch (const std::exception& e) {
+        isRunningHealthCheck_.store(false);
         LOG_ERROR("Failed to start health check: %s", e.what());
         return false;
     }
 }
 
 bool ConsulClient::stopHealthCheck() {
-    if (!isRunningHealthCheck_ || !healthCheckTimer_) {
+    if (!isRunningHealthCheck_.load()) {
         return true;
     }
     
     try {
-        healthCheckTimer_->close([](uv::Timer* timer) {
-            LOG_INFO("Health check timer closed");
-        });
+        // 先设置停止标志
+        isRunningHealthCheck_.store(false);
         
-        isRunningHealthCheck_ = false;
+        // 停止定时器
+        if (healthCheckTimer_) {
+            healthCheckTimer_->close([](uv::Timer* timer) {
+                LOG_INFO("Health check timer closed");
+            });
+            healthCheckTimer_.reset();
+        }
+        
         LOG_INFO("Health check stopped");
         return true;
     } catch (const std::exception& e) {
@@ -167,7 +196,12 @@ bool ConsulClient::reportHealth(bool isHealthy) {
 }
 
 void ConsulClient::onHealthCheckTimer() {
-    reportHealth();
+    // 将健康检查任务提交到工作线程
+    if (workerThread_ && workerThread_->isRunning() && isRunningHealthCheck_.load()) {
+        workerThread_->postTask([this]() {
+            this->reportHealth(true);
+        }, ThreadWrapper::Priority::NORMAL);
+    }
 }
 
 std::string ConsulClient::getLocalIPAddress() {

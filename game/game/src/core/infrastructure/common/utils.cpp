@@ -4,7 +4,11 @@
 #include <iomanip>
 #include <chrono>
 #include <cstring>
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include <atomic>
+#include <cmath>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 
 namespace utils {
 
@@ -94,6 +98,43 @@ std::string generateTimestamp() {
     std::stringstream ss;
     ss << std::hex << timestamp;
     return ss.str();
+}
+
+std::string generateOrderId() {
+    static std::atomic<uint64_t> orderSequence_{0};
+    
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    
+    // 雪花算法简化版本
+    uint64_t timestamp = static_cast<uint64_t>(millis);
+    uint64_t machineId = 1; // 固定机器ID
+    uint64_t seq = orderSequence_.fetch_add(1) & 0xFFF; // 12位序列号
+    
+    uint64_t id = (timestamp << 22) | (machineId << 12) | seq;
+    
+    return std::to_string(id);
+}
+
+std::string generateTransId() {
+    static std::atomic<uint64_t> transSequence_{0};
+    
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    
+    uint64_t timestamp = static_cast<uint64_t>(millis);
+    uint64_t machineId = 2; // 交易ID使用不同的机器ID
+    uint64_t seq = transSequence_.fetch_add(1) & 0xFFF;
+    
+    uint64_t id = (timestamp << 22) | (machineId << 12) | seq;
+    
+    return std::to_string(id);
+}
+
+double roundToTwoDecimals(double value) {
+    return std::round(value * 100.0) / 100.0;
 }
 
 // PerformanceTimer 实现
@@ -201,6 +242,46 @@ void PerformanceTimer::defaultLogOutput(const std::string& description, int64_t 
     if (!description.empty()) {
         LOG_DEBUG("%s completed in %ld%s", description.c_str(), duration, getTimeUnitString(unit));
     }
+}
+
+std::string sha256(const std::string& input) {
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    
+    // 使用OpenSSL的EVP接口计算SHA256哈希值
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    if (ctx == nullptr) {
+        LOG_ERROR("Failed to create EVP_MD_CTX");
+        return "";
+    }
+    
+    if (EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr) != 1) {
+        LOG_ERROR("Failed to initialize SHA256 digest");
+        EVP_MD_CTX_free(ctx);
+        return "";
+    }
+    
+    if (EVP_DigestUpdate(ctx, input.c_str(), input.length()) != 1) {
+        LOG_ERROR("Failed to update SHA256 digest");
+        EVP_MD_CTX_free(ctx);
+        return "";
+    }
+    
+    unsigned int len = SHA256_DIGEST_LENGTH;
+    if (EVP_DigestFinal_ex(ctx, hash, &len) != 1) {
+        LOG_ERROR("Failed to finalize SHA256 digest");
+        EVP_MD_CTX_free(ctx);
+        return "";
+    }
+    
+    EVP_MD_CTX_free(ctx);
+    
+    // 将哈希值转换为十六进制字符串
+    std::stringstream ss;
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        ss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(hash[i]);
+    }
+    
+    return ss.str();
 }
 
 } // namespace utils 

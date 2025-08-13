@@ -16,10 +16,11 @@ type ConsulService struct {
 	queryInterval     int
 	manager           *model.GameServerManager
 	gameServerHandler interfaces.GameServerHandler
+	clientManager     *model.ClientManager         // 客户端管理器
 	lastServers       map[string]*model.GameServer // 用于检测变化
 }
 
-func NewConsulService(address, serviceName string, queryInterval int, manager *model.GameServerManager, gameServerHandler interfaces.GameServerHandler) (*ConsulService, error) {
+func NewConsulService(address, serviceName string, queryInterval int, manager *model.GameServerManager, gameServerHandler interfaces.GameServerHandler, clientManager *model.ClientManager) (*ConsulService, error) {
 	config := api.DefaultConfig()
 	config.Address = address
 	client, err := api.NewClient(config)
@@ -32,6 +33,7 @@ func NewConsulService(address, serviceName string, queryInterval int, manager *m
 		queryInterval:     queryInterval,
 		manager:           manager,
 		gameServerHandler: gameServerHandler,
+		clientManager:     clientManager,
 		lastServers:       make(map[string]*model.GameServer),
 	}, nil
 }
@@ -130,6 +132,11 @@ func (cs *ConsulService) StartBlockingQuery() {
 
 		cs.manager.UpdateServers(newServers)
 
+		// 在服务器更新后，重新关联现有客户端
+		if hasChanges {
+			cs.reassociateExistingClients(newServers)
+		}
+
 		// 只在有变化时打印详细信息
 		if hasChanges {
 			util.Logger.Infof("========== Consul Service Discovery Update ==========")
@@ -161,6 +168,54 @@ func (cs *ConsulService) StartBlockingQuery() {
 				}
 			}
 		}
+	}
+}
+
+// reassociateExistingClients 重新关联现有客户端到新的GameServer连接
+func (cs *ConsulService) reassociateExistingClients(newServers map[string]*model.GameServer) {
+	if cs.clientManager == nil {
+		return
+	}
+
+	clients := cs.clientManager.GetAllClients()
+	reassociated := 0
+
+	for _, client := range clients {
+		if client.GameServer == nil {
+			// 客户端没有关联的GameServer，尝试关联到可用的服务器
+			// 这通常发生在GameServer重连后
+			if len(newServers) > 0 {
+				// 选择第一个可用的游戏服务器（简单的负载均衡）
+				for serverID, newServer := range newServers {
+					util.Logger.Infof("Reassociating orphaned client %s to GameServer %s",
+						client.SessionID, serverID)
+					client.GameServer = newServer
+					reassociated++
+					break // 只关联到一个服务器
+				}
+			}
+			continue
+		}
+
+		// 找到对应的新服务器连接
+		if newServer, exists := newServers[client.GameServer.ID]; exists {
+			// 只有当连接对象真的改变时才重新关联
+			if client.GameServer.Conn != newServer.Conn {
+				util.Logger.Infof("Reassociating client %s from old GameServer to new connection %s",
+					client.SessionID, newServer.ID)
+				client.GameServer = newServer
+				reassociated++
+			}
+		} else {
+			// 服务器不存在了，清空关联
+			util.Logger.Warnf("Client %s was associated with offline GameServer %s, clearing association",
+				client.SessionID, client.GameServer.ID)
+			client.GameServer = nil
+		}
+	}
+
+	if reassociated > 0 {
+		util.Logger.Infof("Successfully reassociated %d clients to updated GameServer connections", reassociated)
 	}
 }
 

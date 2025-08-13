@@ -1,6 +1,6 @@
 #include "open_search_client.h"
 #include <sstream>
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include <openssl/hmac.h>
 #include <openssl/sha.h>
 #include <openssl/evp.h>

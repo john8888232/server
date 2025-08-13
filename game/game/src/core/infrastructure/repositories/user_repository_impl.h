@@ -5,7 +5,7 @@
 #include <string>
 #include "core/domain/repositories/i_user_repository.h"
 #include "core/domain/models/user.h"
-#include "core/infrastructure/persistence/mysql_client.h"
+#include "core/infrastructure/persistence/mysql_clientV2.h"
 #include "core/infrastructure/persistence/redis_client.h"
 
 // 用户仓库MySQL实现
@@ -15,7 +15,7 @@ public:
     ~UserRepositoryImpl() override;
     
     // 根据登录名查找用户
-    std::shared_ptr<User> findByLoginName(const std::string& loginName) override;
+    std::shared_ptr<User> findByLoginName(const std::string& loginName, const std::string& gameType = "") override;
     
     // 根据登录名和令牌验证用户
     bool validateUserToken(const std::string& loginName, const std::string& token) override;
@@ -31,7 +31,7 @@ public:
     
 private:
     // 获取MySQL客户端
-    std::shared_ptr<MySQLClient> getMySQLClient();
+    std::shared_ptr<MySQLClientV2> getMySQLClient();
     
     // 获取Redis客户端
     std::shared_ptr<RedisClient> getRedisClient();

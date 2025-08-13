@@ -1,7 +1,6 @@
 #include "mines_cash_handler.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <google/protobuf/util/json_util.h>
-#include "core/infrastructure/proto/game.pb.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
 #include "games/game_registry.h"
@@ -18,7 +17,6 @@ MinesCashHandler::MinesCashHandler(ResponseCallback responseCallback)
 
 bool MinesCashHandler::initialize() {
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
@@ -51,6 +49,12 @@ bool MinesCashHandler::initialize() {
             return false;
         }
         
+        minesGameRepository_ = std::make_shared<MinesGameRepositoryImpl>();
+        if (!minesGameRepository_) {
+            LOG_ERROR("Failed to create MinesGameRepositoryImpl");
+            return false;
+        }
+        
         LOG_DEBUG("MinesCashHandler initialized");
         return true;
     } catch (const std::exception& e) {
@@ -76,7 +80,7 @@ void MinesCashHandler::handleMessage(const std::string& sessionId, const std::st
             return;
         }
         
-        auto currentGame = gameService_->getCurrentGame();
+        std::shared_ptr<MinesGame> currentGame = gameService_->getCurrentGame();
         if (!currentGame) {
             LOG_ERROR("No active game found for player %s (session %s)", 
                      request.loginname().c_str(), sessionId.c_str());
@@ -84,23 +88,36 @@ void MinesCashHandler::handleMessage(const std::string& sessionId, const std::st
             return;
         }
         
-        proto::MinesCashRes response;
+        // 使用统一的兑现执行器（IMMEDIATE_DB模式）
+        auto cashExecutor = currentGame->createCashOutExecutor(true);
+        auto result = cashExecutor->execute(currentGame, 
+                                           request.roundid(), request.loginname(), 
+                                           request.playtype(), CashOutMode::IMMEDIATE_DB);
         
-        bool success = currentGame->processCashOut(request.loginname(), request.roundid(), 
-                                                 request.playtype(), response);
-        
-        if (success) {
-            LOG_INFO("Cash out successful for player %s (session %s): playType=%d, balance=%.2f", 
+        if (result.success) {
+            // 设置响应
+            auto response = result.response;
+            if (result.reckonRecord) {
+                auto* protoReckon = response.mutable_reckon();
+                protoReckon->CopyFrom(*result.reckonRecord);
+            }
+            
+            std::string responseData;
+            response.SerializeToString(&responseData);
+            responseCallback_(sessionId, Protocol::SC_MINES_CASH_RES, responseData);
+            
+            LOG_INFO("Cash out successful for player %s (session %s): playType=%d, payout=%.2f, balance=%.2f", 
                      request.loginname().c_str(), sessionId.c_str(), 
-                     request.playtype(), response.balance());
+                     request.playtype(), result.payoutAmount, response.balance());
         } else {
-            LOG_WARN("Failed to cash out for player %s (session %s): %s", 
-                     request.loginname().c_str(), sessionId.c_str(), response.message().c_str());
+            // 发送错误响应
+            std::string responseData;
+            result.response.SerializeToString(&responseData);
+            responseCallback_(sessionId, Protocol::SC_MINES_CASH_RES, responseData);
+            
+            LOG_WARN("Cash out failed for player %s (session %s): %s", 
+                     request.loginname().c_str(), sessionId.c_str(), result.response.message().c_str());
         }
-        
-        std::string responseData;
-        response.SerializeToString(&responseData);
-        responseCallback_(sessionId, Protocol::SC_MINES_CASH_RES, responseData);
         
     } catch (const std::exception& e) {
         LOG_ERROR("Exception in MinesCashHandler: %s", e.what());
@@ -118,7 +135,7 @@ void MinesCashHandler::sendErrorResponse(const std::string& sessionId, int error
     response.set_message(ErrorCode::getErrorMessage(errorCode));
     response.set_roundid(roundId);
     response.set_balance(balance);
-    
+
     std::string responseData;
     response.SerializeToString(&responseData);
     responseCallback_(sessionId, Protocol::SC_MINES_CASH_RES, responseData);

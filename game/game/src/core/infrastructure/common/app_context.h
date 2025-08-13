@@ -11,26 +11,21 @@
 #include "core/domain/models/game_manager.h"
 #include "config_manager.h"
 #include "core/infrastructure/persistence/database_factory.h"
-
-// 前向声明
-class GameRegistry;
+#include "thread_pool.h"
 
 // 应用上下文 - 管理所有全局资源
 class AppContext : public std::enable_shared_from_this<AppContext> {
 public:
-    // 构造函数
     AppContext();
     
-    // 析构函数
     ~AppContext() = default;
 
-    // 禁止拷贝和移动
     AppContext(const AppContext&) = delete;
     AppContext& operator=(const AppContext&) = delete;
     AppContext(AppContext&&) = delete;
     AppContext& operator=(AppContext&&) = delete;
 
-    // 初始化上下文 - 修改为不需要传递依赖参数
+    // 初始化上下文
     bool initialize();
     
     // 清理资源
@@ -57,13 +52,6 @@ public:
     std::shared_ptr<DatabaseFactory> getDatabaseFactory() const { return dbFactory_; }
 
 private:
-    // 建立配置更新链路
-    void setupConfigUpdateChain(std::shared_ptr<GameRegistry> gameRegistry);
-    
-    // 处理游戏配置更新
-    // 配置更新相关方法已精简，现在使用ConfigManager::reloadGameConfigFromRedis()直接处理
-    
-    // 各种资源 - AppContext拥有所有这些资源
     uv::EventLoop* eventLoop_;  // 不拥有此指针，由libuv管理
     
     // 使用shared_ptr表示共享访问的组件

@@ -45,6 +45,7 @@ func LoadConfig(filePath string) error {
 	if err != nil {
 		return err
 	}
+
 	log.Printf("Configuration loaded: %+v\n", AppConfig)
 	return nil
 }

@@ -1,5 +1,5 @@
 #include "message_router.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 
 MessageRouter::MessageRouter() {
 }

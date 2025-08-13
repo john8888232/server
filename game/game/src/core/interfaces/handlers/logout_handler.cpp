@@ -1,6 +1,6 @@
 #include "logout_handler.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include "core/infrastructure/proto/game.pb.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/infrastructure/common/error_code.h"
 #include "core/infrastructure/network/protocol.h"
 #include "core/infrastructure/common/app_context.h"
@@ -90,7 +90,6 @@ uint32_t LogoutHandler::getMsgId() const {
 
 bool LogoutHandler::canPlayerLogout(const std::string& loginname) {
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
@@ -163,7 +162,6 @@ void LogoutHandler::cleanupPlayerMappings(const std::string& sessionId, const st
             LOG_WARN("Failed to clear Redis online info for player: %s", loginname.c_str());
         }
 
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {

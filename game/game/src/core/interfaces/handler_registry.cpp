@@ -3,7 +3,7 @@
 #include "core/interfaces/handlers/logout_handler.h"
 #include "core/interfaces/handlers/heartbeat_handler.h"
 #include "core/interfaces/handlers/disconnect_handler.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
 #include "games/game_registry.h"
@@ -18,7 +18,6 @@ bool HandlerRegistry::registerSystemHandlers() {
     LOG_INFO("Registering system message handlers...");
     
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
@@ -51,7 +50,6 @@ bool HandlerRegistry::registerUserHandlers() {
     LOG_INFO("Registering user message handlers...");
     
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
@@ -108,7 +106,6 @@ bool HandlerRegistry::registerGameSpecificHandlers() {
     LOG_INFO("Registering game-specific message handlers...");
     
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {

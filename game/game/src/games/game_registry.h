@@ -16,7 +16,6 @@ class IGameService;
 // 游戏注册表 - 管理所有支持的游戏类型
 class GameRegistry {
 public:
-    // 修改构造函数，不再需要传递AppContext
     GameRegistry();
     ~GameRegistry();
     

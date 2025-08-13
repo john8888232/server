@@ -89,7 +89,7 @@ func (ch *ClientHandler) handleClientMessages(client *model.Client, clientIP str
 		}
 
 		util.Logger.Infof("Received raw data from client %s (length: %d bytes)", client.SessionID, len(data))
-		util.Logger.Infof("Raw data hex: %x", data)
+		//util.Logger.Infof("Raw data hex: %x", data)
 		util.Logger.Infof("Client IP: %s", clientIP)
 
 		// 使用 Unpack 解包消息
@@ -127,9 +127,13 @@ func (ch *ClientHandler) handleClientMessages(client *model.Client, clientIP str
 				util.Logger.Warnf("No GameServer associated with client %s for msgID %d", client.SessionID, msgID)
 				continue
 			}
+			if client.GameServer.Conn == nil {
+				util.Logger.Warnf("GameServer connection is nil for client %s, msgID %d", client.SessionID, msgID)
+				continue
+			}
 			// 打包并转发到 GameServer (TCP)
 			tcpData := util.Pack(msgID, client.SessionID, msgData)
-			util.Logger.Infof("TCP data sending to GameServer (length: %d): %x", len(tcpData), tcpData)
+			//util.Logger.Infof("TCP data sending to GameServer (length: %d): %x", len(tcpData), tcpData)
 			_, err := client.GameServer.Conn.Write(tcpData)
 			if err != nil {
 				util.Logger.Errorf("Failed to forward message to GameServer for client %s: %v", client.SessionID, err)
@@ -266,16 +270,77 @@ func generateSessionID() string {
 	return base64.RawURLEncoding.EncodeToString(buf)
 }
 
-// getClientIP 获取客户端真实 IP
+// getClientIP 获取客户端真实 IP，优先返回IPv4地址
 func getClientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Forwarded-For"); ip != "" {
-		return strings.Split(ip, ",")[0]
+	// 检查代理转发的头部，可能包含多个IP
+	if xForwardedFor := r.Header.Get("X-Forwarded-For"); xForwardedFor != "" {
+		ips := strings.Split(xForwardedFor, ",")
+		// 遍历所有IP，优先选择IPv4
+		for _, ip := range ips {
+			ip = strings.TrimSpace(ip)
+			if isIPv4(ip) {
+				return ip
+			}
+		}
+		// 如果没有IPv4，返回第一个IP
+		return strings.TrimSpace(ips[0])
 	}
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
+
+	// 检查 X-Real-IP 头部
+	if realIP := r.Header.Get("X-Real-IP"); realIP != "" {
+		return strings.TrimSpace(realIP)
 	}
+
+	// 从连接地址中提取IP
 	host, _, _ := net.SplitHostPort(r.RemoteAddr)
+
+	// 如果是IPv6地址，尝试提取IPv4映射地址
+	if strings.Contains(host, ":") {
+		// 检查是否是IPv4映射的IPv6地址 (::ffff:192.168.1.1)
+		if strings.HasPrefix(host, "::ffff:") {
+			ipv4Part := strings.TrimPrefix(host, "::ffff:")
+			if isIPv4(ipv4Part) {
+				return ipv4Part
+			}
+		}
+		// 对于纯IPv6地址，记录日志并返回
+		util.Logger.Infof("Client connected via IPv6: %s", host)
+	}
+
 	return host
+}
+
+// isIPv4 检查字符串是否为有效的IPv4地址
+func isIPv4(ip string) bool {
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return false
+	}
+
+	for _, part := range parts {
+		if len(part) == 0 || len(part) > 3 {
+			return false
+		}
+
+		// 检查是否为纯数字
+		for _, char := range part {
+			if char < '0' || char > '9' {
+				return false
+			}
+		}
+
+		// 转换为数字并检查范围
+		if num := 0; true {
+			for _, char := range part {
+				num = num*10 + int(char-'0')
+			}
+			if num > 255 {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // sendConnCloseToGameServer 向游戏服务器发送客户端断开连接通知

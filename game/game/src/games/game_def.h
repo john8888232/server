@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <cstdint>
 
 // 游戏类型ID常量
 constexpr int MINES_PRO_ID = 1;
@@ -23,12 +24,10 @@ namespace MinesProPlayType {
         return playType == LEFT || playType == RIGHT;
     }
 }
-// 交易原因常量
-namespace TransactionReason {
-    constexpr const char* BET = "BET";           // 下注
-    constexpr const char* RECKON = "RECKON";     // 派彩
-    constexpr const char* BRING_IN = "BRING_IN"; // 带入
-    constexpr const char* BRING_OUT = "BRING_OUT"; // 带出
+namespace TransactionType {
+    constexpr uint32_t BET = 3;
+    constexpr uint32_t WIN = 4;
+    constexpr uint32_t CANCEL = 5;
 }
 
 // 游戏类型到ID的映射

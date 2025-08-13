@@ -1,5 +1,5 @@
 #include "game_manager.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "src/games/game_registry.h"
 #include "core/interfaces/message_router.h"
 #include "core/infrastructure/common/app_context.h"
@@ -12,7 +12,6 @@ GameManager::GameManager() {
 }
 
 GameManager::~GameManager() {
-    // 清理所有游戏
     std::lock_guard<std::mutex> lock(mutex_);
     games_.clear();
     playerToGame_.clear();
@@ -21,7 +20,6 @@ GameManager::~GameManager() {
 bool GameManager::initialize(const std::string& serverId, std::shared_ptr<MessageRouter> messageRouter) {
     serverId_ = serverId;
     
-    // 从依赖容器获取AppContext
     auto& container = getDependencyContainer();
     appContext_ = container.resolve<AppContext>();
     if (!appContext_) {

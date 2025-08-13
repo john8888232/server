@@ -1,7 +1,6 @@
 #include "mines_auto_cash_handler.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <google/protobuf/util/json_util.h>
-#include "core/infrastructure/proto/game.pb.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
 #include "games/game_registry.h"
@@ -19,7 +18,6 @@ MinesAutoCashHandler::MinesAutoCashHandler(ResponseCallback responseCallback)
 
 bool MinesAutoCashHandler::initialize() {
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {

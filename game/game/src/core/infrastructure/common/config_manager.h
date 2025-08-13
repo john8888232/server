@@ -1,12 +1,9 @@
-// src/core/infrastructure/common/config_manager.h
 #ifndef CONFIG_MANAGER_H
 #define CONFIG_MANAGER_H
 
 #include <string>
-#include <memory>
 #include <unordered_map>
-#include <functional>
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/nlohmann/json.hpp"
 
 using json = nlohmann::json;
 

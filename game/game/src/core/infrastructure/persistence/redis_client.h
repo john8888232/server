@@ -7,7 +7,7 @@
 #include <memory>
 #include <functional>
 #include <sw/redis++/redis++.h>
-#include "../common/config_manager.h"
+#include "core/infrastructure/common/config_manager.h"
 #include "third_party/libuv_cpp/include/uv11.hpp"
 
 class RedisClient {

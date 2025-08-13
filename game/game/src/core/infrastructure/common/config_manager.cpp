@@ -1,12 +1,11 @@
-// src/core/infrastructure/common/config_manager.cpp
 #include "config_manager.h"
 #include <fstream>
-#include "../persistence/database_factory.h"
-#include "../persistence/redis_client.h"
-#include "app_context.h"
-#include "../../../games/game_registry.h"
-#include "../../../games/game_factory.h"
-#include "dependency_container.h"
+#include "core/infrastructure/persistence/database_factory.h"
+#include "core/infrastructure/persistence/redis_client.h"
+#include "core/infrastructure/common/app_context.h"
+#include "games/game_registry.h"
+#include "games/game_factory.h"
+#include "core/infrastructure/common/dependency_container.h"
 
 extern DependencyContainer& getDependencyContainer();
 
@@ -43,7 +42,6 @@ bool ConfigManager::loadGameConfig() {
             return false;
         }
         
-        // 从依赖容器获取DatabaseFactory
         auto& container = getDependencyContainer();
         auto dbFactory = container.resolve<DatabaseFactory>();
         if (!dbFactory) {
@@ -148,7 +146,6 @@ bool ConfigManager::reloadGameConfigFromRedis(const std::string& gameType) {
             return false;
         }
         
-        // 从依赖容器获取DatabaseFactory
         auto& container = getDependencyContainer();
         auto dbFactory = container.resolve<DatabaseFactory>();
         if (!dbFactory) {
@@ -182,7 +179,6 @@ bool ConfigManager::reloadGameConfigFromRedis(const std::string& gameType) {
         gameConfigs_[gameType] = newConfig;
         LOG_INFO("Updated game config for %s in memory", gameType.c_str());
         
-        // 从依赖容器获取AppContext
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
             LOG_ERROR("AppContext not available in dependency container");

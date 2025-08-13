@@ -1,8 +1,8 @@
 #include "http_server.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include "../common/app_context.h"
-#include "../common/dependency_container.h"
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "core/infrastructure/common/app_context.h"
+#include "core/infrastructure/common/dependency_container.h"
+#include "third_party/nlohmann/json.hpp"
 #include <chrono>
 #include <thread>
 #include <ctime>
@@ -122,7 +122,6 @@ void HttpServer::handleReloadConfig(uv::http::Request& req, uv::http::Response* 
         std::string gameType = requestJson["game_type"].get<std::string>();
         LOG_INFO("Reloading config for game type: %s", gameType.c_str());
         
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {

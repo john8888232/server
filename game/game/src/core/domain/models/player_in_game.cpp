@@ -1,15 +1,14 @@
 #include "player_in_game.h"
 #include "player_session.h"
 #include "user.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 
 PlayerInGame::PlayerInGame(std::shared_ptr<User> user, std::weak_ptr<PlayerSession> session)
     : loginname_(""),
       user_(user),
       playerSession_(session),
       joinTime_(std::chrono::system_clock::now()),
-      active_(true),
-      isBet_(false) {
+      active_(true) {
     if (user) {
         loginname_ = user->getLoginName();
     } else {
@@ -42,20 +41,66 @@ void PlayerInGame::setUser(std::shared_ptr<User> user) {
     }
 }
 
+bool PlayerInGame::isActive() const {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    return active_;
+}
+
+void PlayerInGame::setActive(bool isActive) {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    active_ = isActive;
+}
+
 double PlayerInGame::getBalance() const {
-    // 不再加锁，由调用方保证线程安全（在gameMutex_保护下调用）
+    std::lock_guard<std::mutex> lock(playerMutex_);
     if (user_) {
         return user_->getBalance();
     }
     return 0.0;
 }
 
+int64_t PlayerInGame::getPlayerId() const {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    if (user_) {
+        return user_->getPlayerId();
+    }
+    return 0;
+}
+
+std::string PlayerInGame::getClientIp() const {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    if (user_) {
+        return user_->getClientIp();
+    }
+    return "";
+}
+
 void PlayerInGame::setBalance(double newBalance) {
-    // 不再加锁，由调用方保证线程安全（在gameMutex_保护下调用）
+    std::lock_guard<std::mutex> lock(playerMutex_);
     if (user_) {
         user_->setBalance(newBalance);
         LOG_DEBUG("Updated balance for player %s to %.2f", loginname_.c_str(), newBalance);
     }
+}
+
+bool PlayerInGame::hasBet() const {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    return !betPlayTypes_.empty();
+}
+
+void PlayerInGame::setBetPlayType(int32_t playType) {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    betPlayTypes_.insert(playType); 
+}
+
+void PlayerInGame::cancelBetPlayType(int32_t playType) {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    betPlayTypes_.erase(playType);
+}
+
+void PlayerInGame::resetBetPlayType() {
+    std::lock_guard<std::mutex> lock(playerMutex_);
+    betPlayTypes_.clear();
 }
 
 // 自动兑现相关方法实现
@@ -64,7 +109,7 @@ void PlayerInGame::setAutoCashConfig(int32_t playType, bool enable, int32_t targ
     
     if (enable) {
         // 启用自动兑现
-        autoCashConfigs_[playType] = {true, targetGrid, false};
+        autoCashConfigs_[playType] = {true, targetGrid};
         LOG_INFO("Enabled auto cash for player %s, playType=%d, targetGrid=%d", 
                  loginname_.c_str(), playType, targetGrid);
     } else {
@@ -92,24 +137,15 @@ int32_t PlayerInGame::getAutoCashTargetGrid(int32_t playType) const {
 
 bool PlayerInGame::hasCashedOut(int32_t playType) const {
     std::lock_guard<std::mutex> lock(playerMutex_);
-    auto it = autoCashConfigs_.find(playType);
-    return (it != autoCashConfigs_.end()) ? it->second.hasCashedOut : false;
+    return cashedOutPlayTypes_.count(playType) > 0;
 }
 
-void PlayerInGame::setCashedOut(int32_t playType, bool cashedOut) {
+void PlayerInGame::setCashedOut(int32_t playType) {
     std::lock_guard<std::mutex> lock(playerMutex_);
-    auto it = autoCashConfigs_.find(playType);
-    if (it != autoCashConfigs_.end()) {
-        it->second.hasCashedOut = cashedOut;
-        LOG_INFO("Set cash out status for player %s, playType=%d, cashedOut=%s", 
-                 loginname_.c_str(), playType, cashedOut ? "true" : "false");
-    }
+    cashedOutPlayTypes_.insert(playType);
 }
 
-void PlayerInGame::resetCashOutStatus() {
+void PlayerInGame::resetCashOutPlayType() {
     std::lock_guard<std::mutex> lock(playerMutex_);
-    for (auto& config : autoCashConfigs_) {
-        config.second.hasCashedOut = false;
-    }
-    LOG_INFO("Reset cash out status for player %s", loginname_.c_str());
+    cashedOutPlayTypes_.clear();
 } 

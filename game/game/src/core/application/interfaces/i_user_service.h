@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 #include "core/domain/models/user.h"
-#include "core/infrastructure/proto/game.pb.h"
+#include "core/infrastructure/protogen/game.pb.h"
 
 // 用户服务接口 - 定义应用层用户服务的契约
 class IUserService {

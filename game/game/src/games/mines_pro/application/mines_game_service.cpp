@@ -1,31 +1,16 @@
 #include "mines_game_service.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "games/mines_pro/domain/models/mines_game.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/domain/models/game_manager.h"
 #include "games/game_registry.h"
 #include <ctime>
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
 #include "games/game_factory.h"
 #include "core/infrastructure/common/dependency_container.h"
-
 extern DependencyContainer& getDependencyContainer();
 
 MinesGameService::MinesGameService(GameFactory* factory)
     : factory_(factory) {
-    // 从依赖容器中获取依赖
-    auto& container = getDependencyContainer();
-    appContext_ = container.resolve<AppContext>();
-    dbFactory_ = container.resolve<DatabaseFactory>();
-    
-    if (!appContext_) {
-        LOG_ERROR("Failed to resolve AppContext from dependency container");
-    }
-    
-    if (!dbFactory_) {
-        LOG_ERROR("Failed to resolve DatabaseFactory from dependency container");
-    }
-    
     LOG_DEBUG("MinesGameService initialized");
 }
 
@@ -39,23 +24,19 @@ std::shared_ptr<IGame> MinesGameService::createGame() {
         return nullptr;
     }
     
-    if (!appContext_) {
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (!appContext) {
         LOG_ERROR("AppContext is null");
         return nullptr;
     }
     
-    if (!dbFactory_) {
-        LOG_ERROR("DatabaseFactory is null");
-        return nullptr;
-    }
-    
-    // 使用无参构造函数创建MinesGame
     auto game = std::make_shared<MinesGame>();
     const auto& config = factory_->getConfig();
     LOG_INFO("Creating MinesGame with config: %s", config.dump().c_str());
     game->initializeWithConfig(config);
     
-    auto gameManager = appContext_->getGameManager();
+    auto gameManager = appContext->getGameManager();
     if (!gameManager->addGame(game)) {
         LOG_ERROR("Failed to add game to manager");
         return nullptr;
@@ -77,7 +58,9 @@ bool MinesGameService::destroyGame(std::shared_ptr<IGame> game) {
         return false;
     }
     
-    if (!appContext_) {
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (!appContext) {
         LOG_ERROR("AppContext is null");
         return false;
     }
@@ -86,7 +69,7 @@ bool MinesGameService::destroyGame(std::shared_ptr<IGame> game) {
     
     game->stop();
     
-    auto gameManager = appContext_->getGameManager();
+    auto gameManager = appContext->getGameManager();
     if (!gameManager->removeGame(game)) {
         LOG_ERROR("Failed to remove game from manager");
         return false;
@@ -102,7 +85,9 @@ void MinesGameService::stopAllGames() {
         return;
     }
     
-    if (!appContext_) {
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (!appContext) {
         LOG_ERROR("AppContext is null");
         return;
     }
@@ -110,7 +95,7 @@ void MinesGameService::stopAllGames() {
     std::string gameType = factory_->getGameType();
     LOG_INFO("Stopping all games of type: %s", gameType.c_str());
     
-    auto gameManager = appContext_->getGameManager();
+    auto gameManager = appContext->getGameManager();
     
     if (!gameManager) {
         LOG_WARN("GameManager not available during stopAllGames");
@@ -141,46 +126,20 @@ void MinesGameService::stopAllGames() {
     LOG_INFO("Completed stopping all games of type: %s", gameType.c_str());
 }
 
-std::shared_ptr<MinesGame> MinesGameService::getGameByRoundId(const std::string& roundId) {
-    if (!factory_) {
-        LOG_ERROR("Factory is null in getGameByRoundId");
-        return nullptr;
-    }
-    
-    if (!appContext_) {
-        LOG_ERROR("AppContext is null");
-        return nullptr;
-    }
-    
-    auto gameManager = appContext_->getGameManager();
-    if (!gameManager) {
-        LOG_ERROR("GameManager not available");
-        return nullptr;
-    }
-    
-    auto games = gameManager->getGamesByType(factory_->getGameType());
-    for (auto& game : games) {
-        if (game && game->roundID() == roundId) {
-            return std::dynamic_pointer_cast<MinesGame>(game);
-        }
-    }
-    
-    LOG_WARN("Game with roundId %s not found", roundId.c_str());
-    return nullptr;
-}
-
 std::shared_ptr<MinesGame> MinesGameService::getCurrentGame() {
     if (!factory_) {
         LOG_ERROR("Factory is null in getCurrentGame");
         return nullptr;
     }
     
-    if (!appContext_) {
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (!appContext) {
         LOG_ERROR("AppContext is null");
         return nullptr;
     }
     
-    auto gameManager = appContext_->getGameManager();
+    auto gameManager = appContext->getGameManager();
     if (!gameManager) {
         LOG_ERROR("GameManager not available");
         return nullptr;

@@ -1,9 +1,8 @@
 #ifndef LOGIN_HANDLER_H
 #define LOGIN_HANDLER_H
 
-#include "../message_router.h"
-#include "../../infrastructure/network/protocol.h"
-#include "../../infrastructure/network/tcp_server.h"
+#include "core/interfaces/message_router.h"
+#include "core/infrastructure/network/tcp_server.h"
 #include <functional>
 #include <memory>
 #include "core/application/interfaces/i_user_service.h"

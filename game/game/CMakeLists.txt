@@ -63,21 +63,19 @@ list(APPEND CMAKE_MODULE_PATH "/usr/local/cmake")
 find_package(ppconsul REQUIRED)
 include_directories("/usr/local/include")  # ppconsul 头文件位置
 
-find_library(ELASTICLIENT_LIBRARY NAMES elasticlient REQUIRED)
-
 # 查找jsoncpp库
 find_library(JSONCPP_LIBRARY NAMES jsoncpp REQUIRED)
 find_path(JSONCPP_INCLUDE_DIR NAMES json/json.h REQUIRED)
 include_directories(${JSONCPP_INCLUDE_DIR})
 
-# 查找cpr库
-find_library(CPR_LIBRARY NAMES cpr REQUIRED)
-find_path(CPR_INCLUDE_DIR NAMES cpr/cpr.h REQUIRED)
-include_directories(${CPR_INCLUDE_DIR})
-
-# 查找OpenSSL库（用于AWS V4签名）
+# 查找OpenSSL库
 find_package(OpenSSL REQUIRED)
-include_directories(${OPENSSL_INCLUDE_DIR})
+if(OPENSSL_FOUND)
+    message(STATUS "Found OpenSSL ${OPENSSL_VERSION}")
+    include_directories(${OPENSSL_INCLUDE_DIR})
+else()
+    message(FATAL_ERROR "OpenSSL not found")
+endif()
 
 # 添加源代码子目录
 add_subdirectory(src)
@@ -98,11 +96,9 @@ target_link_libraries(game_server PRIVATE
     ${HIREDIS_LIBRARY}
     ${REDIS_PLUS_PLUS_LIBRARY}
     ppconsul  # 使用 ppconsul 目标而不是变量
-    ${ELASTICLIENT_LIBRARY}
     ${JSONCPP_LIBRARY}
     ${Protobuf_LIBRARIES}
-    ${OPENSSL_LIBRARIES}
-    ${CPR_LIBRARY}
+    ${OPENSSL_LIBRARIES}  # 添加OpenSSL库
 )
 
 # 创建bin目录并拷贝可执行文件和配置文件

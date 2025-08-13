@@ -65,11 +65,16 @@ public:
         
         LogConfig() : 
             logDir("./logs"),
+#ifdef ENABLE_DEBUG_LOGGING
+            level(Debug),
+#else
             level(Info),
+#endif
             maxFileSize(10 * 1024 * 1024),  // 10MB default
             enableConsole(true),
             asyncMode(true),
-            maxQueueSize(10000) {}
+            maxQueueSize(10000) {
+            }
     };
 
     static LogWriter* Instance();

@@ -7,8 +7,8 @@
 #include <mutex>
 #include <functional>
 #include "third_party/libuv_cpp/include/uv11.hpp"
-#include "../common/utils.h"
-#include "../common/sharded_mutex.h"
+#include "core/infrastructure/common/utils.h"
+#include "core/infrastructure/common/sharded_mutex.h"
 #include "core/domain/models/user.h"
 #include "core/domain/models/player_session.h"
 
@@ -54,7 +54,7 @@ public:
     void updatePlayerSessionActiveTime(const std::string& playerSessionId);
     
     bool sendToPlayer(const std::string& playerSessionId, uint32_t msgId, const std::string& data);
-    bool sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data);
+    bool sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data, const std::string& sessionId = "");
     
     // 查询功能
     std::vector<std::string> getPlayerSessionsByGateway(const std::string& gatewayId);
@@ -83,8 +83,8 @@ private:
     std::unordered_map<std::string, std::vector<std::string>> gatewayPlayerSessions_;
     
     // 使用分片互斥量替代单一互斥量
-    ShardedMutex<32> playerMutex_;    // 玩家分片锁，32个分片
-    ShardedMutex<8> gatewayMutex_;    // Gateway分片锁，8个分片
+    ShardedMutex<32> playerMutex_;    // 玩家会话相关的分片锁，32个分片
+    ShardedMutex<8> gatewayMutex_;    // Gateway相关的分片锁，8个分片
     mutable std::shared_mutex globalMutex_;  // 全局操作使用的互斥量
     
     // 消息发送回调（由TcpServer注入）

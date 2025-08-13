@@ -5,9 +5,9 @@
 #include <string>
 #include <functional>
 
-#include "../common/config_manager.h"
+#include "core/infrastructure/common/config_manager.h"
 #include "../common/session_thread_pool.h"
-#include "../../interfaces/message_router.h"
+#include "core/interfaces/message_router.h"
 #include "connection_manager.h"
 
 
@@ -41,7 +41,7 @@ public:
     bool sendToPlayer(const std::string& playerSessionId, uint32_t msgId, const std::string& data);
     
     // 发送系统消息给指定Gateway
-    bool sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data);
+    bool sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data, const std::string& sessionId = "");
     
     // 广播消息给所有连接
     void broadcastMessage(uint32_t msgId, const std::string& data);

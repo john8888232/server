@@ -30,7 +30,7 @@ public:
     GameCreationMode getGameCreationMode() const override;
     
     // 配置更新通知
-    void onConfigUpdated(const json& oldConfig, const json& newConfig) override;
+    void onConfigUpdated(const json& newConfig) override;
 };
 
 #endif // MINES_FACTORY_H 

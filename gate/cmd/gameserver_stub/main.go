@@ -38,6 +38,10 @@ type Config struct {
 		Password string `yaml:"password"`
 		DB       int    `yaml:"db"`
 	} `yaml:"redis"`
+	Logger struct {
+		Level string `yaml:"level"`
+		File  string `yaml:"file"`
+	} `yaml:"logger"`
 }
 
 var (
@@ -53,6 +57,17 @@ func main() {
 		log.Fatalf("Failed to load config file: %v", err)
 	}
 
+	// 初始化日志系统
+	util.InitLogger(&util.StubConfig{
+		Logger: struct {
+			Level string
+			File  string
+		}{
+			Level: cfg.Logger.Level,
+			File:  cfg.Logger.File,
+		},
+	})
+
 	// 注册到 Consul
 	if err := registerToConsul(); err != nil {
 		log.Fatalf("Failed to register to Consul: %v", err)
@@ -66,7 +81,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	log.Printf("GameServer Stub listening on %s, ID: %s, GameTypes: %v", listenAddr, cfg.GameServer.ID, cfg.GameServer.GameTypes)
+	util.Logger.Infof("GameServer Stub listening on %s, ID: %s, GameTypes: %v", listenAddr, cfg.GameServer.ID, cfg.GameServer.GameTypes)
 
 	// 接受连接
 	for {

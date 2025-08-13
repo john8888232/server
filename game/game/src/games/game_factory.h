@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <string>
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/nlohmann/json.hpp"
 #include "core/interfaces/message_router.h"
 #include "core/application/interfaces/i_game_service.h"
 
@@ -37,7 +37,7 @@ public:
     const json& getConfig() const { return config_; }
     
     // 配置更新通知 - 子类可以重写此方法来处理配置更新
-    virtual void onConfigUpdated(const json& oldConfig, const json& newConfig) {}
+    virtual void onConfigUpdated(const json& newConfig) {}
     
     // 启动游戏服务 - 在服务器启动时调用，用于初始化游戏相关的服务
     virtual bool start() = 0;

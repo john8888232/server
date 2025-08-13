@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Gateway网关服务 - 连接外部的Consul和Redis
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.simple
+    container_name: gate-gateway
+    ports:
+      - "5600:5600"   # WebSocket端口
+      - "6060:6060"   # pprof端口
+    volumes:
+      - ./configs/config.yaml:/app/config.yaml:ro
+      - gateway_logs:/app/logs
+    environment:
+      - ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # 从环境变量获取外部服务连接信息
+      - CONSUL_ADDR=${CONSUL_ADDR:-consul.example.com:8500}
+      - REDIS_ADDR=${REDIS_ADDR:-redis.example.com:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    restart: unless-stopped
+    command: ["./gateway"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6060/debug/pprof/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# 数据卷
+volumes:
+  gateway_logs:
+    driver: local

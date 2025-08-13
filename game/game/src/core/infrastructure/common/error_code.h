@@ -20,6 +20,7 @@ namespace ErrorCode {
     const int INACTIVE = 1006;
     const int OTHER_LOGIN = 1007;
     const int IN_GAME = 1008;
+    const int INVALID_SESSION = 1009;
     
     // 游戏相关错误码 (2000-2999)
     const int GAME_NOT_FOUND = 2000;
@@ -49,6 +50,8 @@ namespace ErrorCode {
     // 下注限制相关错误码 (2021-2025)
     const int BET_AMOUNT_TOO_SMALL = 2021;
     const int BET_AMOUNT_TOO_LARGE = 2022;
+    const int BALANCE_QUERY_FAILED = 2023;
+    const int DEDUCTION_FAILED = 2024;
     
     // 获取错误消息
     inline const char* getErrorMessage(int errorCode) {
@@ -93,6 +96,8 @@ namespace ErrorCode {
             // 下注限制相关错误消息
             case BET_AMOUNT_TOO_SMALL: return "bet amount is below minimum limit";
             case BET_AMOUNT_TOO_LARGE: return "bet amount exceeds maximum limit";
+            case BALANCE_QUERY_FAILED: return "failed to query player balance";
+            case DEDUCTION_FAILED: return "balance deduction failed";
             
             
             default: return "unknown error";

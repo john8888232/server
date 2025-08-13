@@ -8,6 +8,7 @@
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/Logger_helper.h"
 #include "core/infrastructure/common/dependency_container.h"
+#include "core/infrastructure/common/memory_monitor.h"
 
 extern DependencyContainer& getDependencyContainer();
 
@@ -68,40 +69,71 @@ void graceful_shutdown() {
 
 // 信号处理器
 void signal_handler(int signum) {
-    static int sigint_count = 0;
+    static volatile sig_atomic_t sigint_count = 0;
+    static volatile sig_atomic_t in_crash_handler = 0;
     
     switch (signum) {
         case SIGINT:
             sigint_count++;
             if (sigint_count == 1) {
-                LOG_INFO("Received SIGINT, initiating graceful shutdown");
+                // 使用async-signal-safe的方式记录
+                const char msg[] = "Received SIGINT, initiating graceful shutdown\n";
+                write(STDERR_FILENO, msg, sizeof(msg) - 1);
                 graceful_shutdown();
             } else {
                 // 第二次收到SIGINT，强制退出
-                LOG_WARN("Received SIGINT again, forcing immediate exit");
-                std::cout << "Forcing immediate exit due to repeated SIGINT..." << std::endl;
+                const char msg[] = "Received SIGINT again, forcing immediate exit\n";
+                write(STDERR_FILENO, msg, sizeof(msg) - 1);
                 std::_Exit(1);
             }
             break;
         case SIGTERM:
-            LOG_INFO("Received SIGTERM, initiating graceful shutdown");
-            graceful_shutdown();
+            {
+                const char msg[] = "Received SIGTERM, initiating graceful shutdown\n";
+                write(STDERR_FILENO, msg, sizeof(msg) - 1);
+                graceful_shutdown();
+            }
             break;
         case SIGSEGV:
-            LOG_ERROR("Received SIGSEGV (Segmentation Fault)");
-            print_backtrace();
-            signal(signum, SIG_DFL); // 重置为默认处理器
-            // 日志记录后，重新抛出信号以生成核心转储
-            raise(signum);
-            break;
         case SIGABRT:
-            LOG_ERROR("Received SIGABRT (Abort)");
-            print_backtrace();
-            signal(signum, SIG_DFL); // 重置为默认处理器
-            raise(signum);
+        case SIGFPE:
+        case SIGILL:
+            {
+                // 防止信号处理器递归调用
+                if (in_crash_handler) {
+                    const char msg[] = "Recursive crash detected, generating core dump immediately\n";
+                    write(STDERR_FILENO, msg, sizeof(msg) - 1);
+                    // 直接生成核心转储，不使用_Exit
+                    signal(signum, SIG_DFL);
+                    raise(signum);
+                    return;
+                }
+                in_crash_handler = 1;
+                
+                // 使用安全的崩溃日志记录
+                SafeSignalLogger::logCrash(signum, STDERR_FILENO);
+                
+                // 如果是内存相关错误，记录内存损坏信息
+                if (signum == SIGABRT) {
+                    SafeSignalLogger::logMemoryCorruption(STDERR_FILENO);
+                }
+                
+                // 强制刷新所有输出
+                fsync(STDERR_FILENO);
+                fsync(STDOUT_FILENO);
+                
+                // 重置信号处理器为默认并生成核心转储
+                signal(signum, SIG_DFL);
+                raise(signum);
+            }
             break;
         default:
-            LOG_INFO("Received signal %d", signum);
+            {
+                const char msg[] = "Received unknown signal: ";
+                write(STDERR_FILENO, msg, sizeof(msg) - 1);
+                SafeSignalLogger::writeNumber(STDERR_FILENO, signum);
+                write(STDERR_FILENO, "\n", 1);
+            }
             break;
     }
 }
@@ -111,15 +143,15 @@ void setup_signal_handlers() {
     struct sigaction sa;
     sa.sa_handler = signal_handler;
     sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    
+    sa.sa_flags = SA_RESETHAND; // 信号处理后自动重置为默认处理器
     // 注册终止信号
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGTERM, &sa, NULL);
-    
     // 注册崩溃信号
     sigaction(SIGSEGV, &sa, NULL);
     sigaction(SIGABRT, &sa, NULL);
+    // 忽略SIGPIPE
+    signal(SIGPIPE, SIG_IGN);
     
     LOG_INFO("Signal handlers installed");
 }
@@ -132,6 +164,11 @@ int main(void) {
     }
     
     LOG_INFO("Game server starting up...");
+    
+    // 初始化内存监控
+    auto& memoryMonitor = MemoryMonitor::getInstance();
+    memoryMonitor.setEnabled(true);
+    LOG_INFO("Memory monitor initialized");
     
     // 获取依赖容器
     auto& container = getDependencyContainer();
@@ -218,5 +255,10 @@ int main(void) {
     LOG_INFO("Main event loop exited");
     graceful_shutdown();
     
+    // 检查内存泄漏
+    LOG_INFO("Checking for memory leaks...");
+    memoryMonitor.dumpMemoryLeaks();
+    
+    LOG_INFO("Server shutdown complete");
     return 0;
 }

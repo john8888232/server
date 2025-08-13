@@ -1,10 +1,10 @@
 #include "login_handler.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include <ctime>
-#include "core/infrastructure/proto/game.pb.h"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/infrastructure/common/error_code.h"
 #include "core/infrastructure/network/protocol.h"
-#include "core/infrastructure/proto/game.pb.h"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/application/services/user_service.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
@@ -99,6 +99,7 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
             }
             
             finalUser = loginResult.user;
+            finalUser->setClientIp(request.client_ip());
             LOG_INFO("Player %s authenticated from database (balance: %.2f)", 
                      request.loginname().c_str(), finalUser->getBalance());
         } else {
@@ -126,7 +127,7 @@ void LoginHandler::handleMessage(const std::string& sessionId, const std::string
         playerInfo->set_username(finalUser->getUserName());
         playerInfo->set_loginname(finalUser->getLoginName()); 
         playerInfo->set_nickname(finalUser->getNickName());
-        playerInfo->set_avatar(finalUser->getAvatar());
+        playerInfo->set_avatar(finalUser->getAvatarUrl());
         playerInfo->set_balance(finalUser->getBalance()); 
         playerInfo->set_currency(finalUser->getCurrency());
             
@@ -189,8 +190,6 @@ bool LoginHandler::handlePlayerAuthenticated(const std::string& playerSessionId,
     try {
         auto playerSession = tcpServer_->getConnectionManager()->getPlayerSession(playerSessionId);
         if (playerSession) {
-            
-            // 从依赖容器获取AppContext
             auto& container = getDependencyContainer();
             auto appContext = container.resolve<AppContext>();
             if (!appContext) {
@@ -324,23 +323,6 @@ void LoginHandler::sendGameSnapshot(const std::string& sessionId, std::shared_pt
             LOG_ERROR("Cannot send snapshot for null game");
             return;
         }
-        
-        // 从依赖容器获取AppContext
-        auto& container = getDependencyContainer();
-        auto appContext = container.resolve<AppContext>();
-        if (!appContext) {
-            LOG_ERROR("AppContext not available in dependency container");
-            return;
-        }
-        
-        auto configManager = appContext->getConfigManager();
-        if (!configManager) {
-            LOG_ERROR("ConfigManager is null");
-            return;
-        }
-        
-        // 获取游戏配置
-        auto gameConfig = configManager->getGameConfig(game->gameType());
         
         // 使用游戏的createSnapshot方法获取快照
         auto snapshot = game->createSnapshot();

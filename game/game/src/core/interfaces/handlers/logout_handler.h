@@ -1,9 +1,9 @@
 #ifndef LOGOUT_HANDLER_H
 #define LOGOUT_HANDLER_H
 
-#include "../message_router.h"
-#include "../../infrastructure/network/protocol.h"
-#include "../../infrastructure/network/tcp_server.h"
+#include "core/interfaces/message_router.h"
+#include "core/infrastructure/network/protocol.h"
+#include "core/infrastructure/network/tcp_server.h"
 #include <functional>
 #include <memory>
 

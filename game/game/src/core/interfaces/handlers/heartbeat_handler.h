@@ -1,8 +1,8 @@
 #ifndef HEARTBEAT_HANDLER_H
 #define HEARTBEAT_HANDLER_H
 
-#include "../message_router.h"
-#include "../../infrastructure/network/protocol.h"
+#include "core/interfaces/message_router.h"
+#include "core/infrastructure/network/protocol.h"
 #include <functional>
 
 class HeartbeatHandler : public IMessageHandler {

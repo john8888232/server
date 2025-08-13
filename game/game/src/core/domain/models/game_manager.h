@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <mutex>
 #include <vector>
-#include <chrono>
 #include <functional>
 #include "core/domain/interfaces/i_game.h"
 #include "core/domain/models/player_session.h"
@@ -22,7 +21,6 @@ public:
     // 游戏状态变更回调函数类型
     using GameStatusCallback = std::function<void(std::shared_ptr<IGame>, GameStatus)>;
     
-    // 构造函数
     GameManager();
     ~GameManager();
 

@@ -4,8 +4,10 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <atomic>
 #include "ppconsul/ppconsul.h"
-#include "../common/config_manager.h"
+#include "core/infrastructure/common/config_manager.h"
+#include "core/infrastructure/common/worker_thread.h"
 #include "third_party/libuv_cpp/include/uv11.hpp"
 
 class ConsulClient {
@@ -23,6 +25,7 @@ public:
 
 private:
     uv::EventLoop* loop_;
+    std::unique_ptr<ThreadWrapper> workerThread_;  // 工作线程
     std::unique_ptr<ppconsul::Consul> consul_;
     std::unique_ptr<ppconsul::agent::Agent> agent_;
     std::string consulUrl_;
@@ -36,11 +39,11 @@ private:
     bool initialized_ = false;
     bool serviceRegistered_ = false;  // 追踪服务是否已注册
     
-    // 健康检查定时器
+    // 健康检查定时器管理
+    std::atomic<bool> isRunningHealthCheck_ = false;
     std::shared_ptr<uv::Timer> healthCheckTimer_;
-    bool isRunningHealthCheck_ = false;
     
-    // 定时器回调
+    // 定时器回调函数
     void onHealthCheckTimer();
     
     // 获取本机IP地址

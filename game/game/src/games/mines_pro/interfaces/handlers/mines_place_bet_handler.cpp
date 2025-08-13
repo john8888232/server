@@ -1,13 +1,13 @@
 #include "mines_place_bet_handler.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <google/protobuf/util/json_util.h>
-#include "core/infrastructure/proto/game.pb.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
-#include "games/game_registry.h"
 #include "core/infrastructure/common/error_code.h"
-#include "games/game_factory.h"
 #include "core/infrastructure/network/protocol.h"
+#include "core/infrastructure/repositories/user_balance_repository_impl.h"
+#include "games/game_registry.h"
+#include "games/game_factory.h"
 
 extern DependencyContainer& getDependencyContainer();
 
@@ -18,7 +18,6 @@ MinesPlaceBetHandler::MinesPlaceBetHandler(ResponseCallback responseCallback)
 
 bool MinesPlaceBetHandler::initialize() {
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {
@@ -51,6 +50,20 @@ bool MinesPlaceBetHandler::initialize() {
             return false;
         }
         
+        // 初始化用户余额仓库
+        userBalanceRepository_ = std::make_shared<UserBalanceRepositoryImpl>();
+        if (!userBalanceRepository_) {
+            LOG_ERROR("Failed to create UserBalanceRepository");
+            return false;
+        }
+        
+        // 初始化Mines游戏仓库
+        minesGameRepository_ = std::make_shared<MinesGameRepositoryImpl>();
+        if (!minesGameRepository_) {
+            LOG_ERROR("Failed to create MinesGameRepository");
+            return false;
+        }
+        
         LOG_DEBUG("MinesPlaceBetHandler initialized");
         return true;
     } catch (const std::exception& e) {
@@ -66,44 +79,64 @@ void MinesPlaceBetHandler::handleMessage(const std::string& sessionId, const std
         proto::MinesPlaceBetReq request;
         if (!request.ParseFromString(data)) {
             LOG_ERROR("Failed to parse MinesPlaceBetReq from session %s", sessionId.c_str());
-            sendErrorResponse(sessionId, ErrorCode::INVALID_REQUEST_FORMAT, "", 0.0);
+            sendErrorResponse(sessionId, ErrorCode::INVALID_REQUEST_FORMAT, "", 0.0, 0);
             return;
         }
-        
         if (request.loginname().empty()) {
             LOG_ERROR("Missing loginname in place bet request from session %s", sessionId.c_str());
-            sendErrorResponse(sessionId, ErrorCode::INVALID_REQUEST, "", 0.0);
+            sendErrorResponse(sessionId, ErrorCode::INVALID_REQUEST, "", 0.0, 0);
             return;
         }
-        
-        auto currentGame = gameService_->getCurrentGame();
-        if (!currentGame) {
-            LOG_ERROR("No active game found for player %s (session %s)", 
-                     request.loginname().c_str(), sessionId.c_str());
-            sendErrorResponse(sessionId, ErrorCode::NO_ACTIVE_GAME, "", 0.0);
+        auto game = gameService_->getCurrentGame();
+        if (!game) {
+            LOG_ERROR("No current game available (session %s)", sessionId.c_str());
+            sendErrorResponse(sessionId, ErrorCode::SYSTEM_ERROR, request.roundid(), 0.0, request.playtype());
             return;
         }
-        
         proto::MinesPlaceBetRes response;
         
-        bool success = currentGame->processPlaceBet(request.loginname(), request.roundid(), 
-                                                   request.playtype(), request.amount(), response);
+        std::shared_ptr<PlayerInGame> playerInGame = game->getPlayer(request.loginname());
+        if (!playerInGame) {
+            LOG_ERROR("Player not found in game: %s (session %s)", request.loginname().c_str(), sessionId.c_str());
+            sendErrorResponse(sessionId, ErrorCode::PLAYER_NOT_FOUND, request.roundid(), 0.0, request.playtype());
+            return;
+        }
+
+        // 2. 验证下注请求
+        bool validationSuccess = game->validateBet(playerInGame, request.roundid(), 
+                                                  request.playtype(), request.amount(), response);
+        if (!validationSuccess) {
+            std::string responseData;
+            response.SerializeToString(&responseData);
+            responseCallback_(sessionId, Protocol::SC_MINES_PLACE_BET_RES, responseData);
+            return;
+        }
+        // 2. 执行数据库扣款
+        bool deductionSuccess = minesGameRepository_->updatePlayerBet(
+            playerInGame->getPlayerId(),            // playerId
+            -request.amount(),                 // change_amount (负数表示扣款)
+            request.roundid(),                       // roundID
+            request.playtype(),                     // playtype
+            playerInGame->getClientIp(),            // playerIP
+            playerInGame                                     
+        );
         
-        if (success) {
-            LOG_INFO("Bet placed successfully for player %s (session %s): playType=%d, amount=%.2f, newBalance=%.2f", 
-                     request.loginname().c_str(), sessionId.c_str(), request.playtype(), request.amount(), response.balance());
-        } else {
-            LOG_WARN("Failed to place bet for player %s (session %s): %s", 
-                     request.loginname().c_str(), sessionId.c_str(), response.message().c_str());
+        if (!deductionSuccess) {
+            LOG_ERROR("Database deduction failed for player %s (session %s)", request.loginname().c_str(), sessionId.c_str());
+            sendErrorResponse(sessionId, ErrorCode::DEDUCTION_FAILED, request.roundid(), response.balance(), request.playtype());
+            return;
         }
         
-        std::string responseData;
-        response.SerializeToString(&responseData);
-        responseCallback_(sessionId, Protocol::SC_MINES_PLACE_BET_RES, responseData);
+        LOG_INFO("Database deduction successful for player %s: amount=%.2f, new_balance=%.2f", 
+                 request.loginname().c_str(), request.amount(), playerInGame->getBalance());
         
+        // 3. 同步下注信息到游戏状态
+        game->syncPlayerBet(playerInGame, request.playtype(), request.amount());
+        sendErrorResponse(sessionId, ErrorCode::SUCCESS, request.roundid(), playerInGame->getBalance(), request.playtype());
+    
     } catch (const std::exception& e) {
         LOG_ERROR("Exception in MinesPlaceBetHandler: %s", e.what());
-        sendErrorResponse(sessionId, ErrorCode::GAME_INTERNAL_ERROR, "", 0.0);
+        sendErrorResponse(sessionId, ErrorCode::GAME_INTERNAL_ERROR, "", 0.0, 0);
     }
 }
 
@@ -111,12 +144,13 @@ uint32_t MinesPlaceBetHandler::getMsgId() const {
     return Protocol::CS_MINES_PLACE_BET_REQ;
 }
 
-void MinesPlaceBetHandler::sendErrorResponse(const std::string& sessionId, int errorCode, const std::string& roundId, double balance) {
+void MinesPlaceBetHandler::sendErrorResponse(const std::string& sessionId, int errorCode, const std::string& roundId, double balance, int playType) {
     proto::MinesPlaceBetRes response;
     response.set_code(errorCode);
     response.set_message(ErrorCode::getErrorMessage(errorCode));
     response.set_roundid(roundId);
     response.set_balance(balance);
+    response.set_playtype(playType);
     
     std::string responseData;
     response.SerializeToString(&responseData);

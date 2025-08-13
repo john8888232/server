@@ -26,6 +26,18 @@ std::string generateRandomString(size_t length);
 // 生成时间戳字符串
 std::string generateTimestamp();
 
+// 生成订单ID
+std::string generateOrderId();
+
+// 生成交易ID
+std::string generateTransId();
+
+// 精度处理 - 将浮点数舍入到两位小数
+double roundToTwoDecimals(double value);
+
+// 计算字符串的SHA256哈希值，返回十六进制字符串
+std::string sha256(const std::string& input);
+
 // 性能计时器
 class PerformanceTimer {
 public:
@@ -36,13 +48,11 @@ public:
         SECONDS
     };
     
-    // 构造函数，可选择是否自动开始计时
     explicit PerformanceTimer(bool autoStart = true);
     
     // 带描述的构造函数，析构时自动输出日志
     PerformanceTimer(const std::string& description, TimeUnit unit = TimeUnit::MILLISECONDS, bool autoStart = true);
     
-    // 析构函数，如果启用了自动日志输出，会记录耗时
     ~PerformanceTimer();
     
     // 手动开始计时

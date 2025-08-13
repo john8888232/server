@@ -2,19 +2,17 @@
 #include "core/infrastructure/common/error_code.h"
 #include <chrono>
 #include <thread>
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <third_party/libuv_cpp/include/Packet.hpp>
-#include "../common/utils.h"
-#include "protocol.h"
-#include "core/infrastructure/proto/game.pb.h"
-#include "../common/utils.h"
-#include "protocol.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "third_party/libuv_cpp/include/Packet.hpp"
+#include "core/infrastructure/common/utils.h"
+#include "core/infrastructure/network/protocol.h"
+#include "core/infrastructure/protogen/game.pb.h"
+#include "core/infrastructure/common/utils.h"
 
 TcpServer::TcpServer(uv::EventLoop* loop) 
     : loop_(loop), messageRouter_(nullptr), 
       connectionManager_(loop),
-      threadPoolSize_(8), maxQueueSizePerWorker_(1000),
-      serverNumericId_(1) {
+      threadPoolSize_(8), maxQueueSizePerWorker_(1000) {
     
     // 设置为大端模式
     uv::Packet::Mode = uv::Packet::DataMode::BigEndian;
@@ -35,32 +33,10 @@ bool TcpServer::initialize(const ConfigManager& configManager) {
         threadPoolSize_ = configManager.getServerConfig()["server"]["thread_pool_size"].get<size_t>();
         maxQueueSizePerWorker_ = configManager.getServerConfig()["server"]["max_queue_size_per_worker"].get<size_t>();
         
-        // 从配置中读取服务器ID
-        const auto& serverConfig = configManager.getServerConfig();
-        serverId_ = "default-server";
-        if (serverConfig.contains("consul") && serverConfig["consul"].contains("service_id")) {
-            serverId_ = serverConfig["consul"]["service_id"].get<std::string>();
-        }
-        
-        // 从服务器ID中提取数字部分，例如从"game_server_1"中提取"1"
-        std::string serverIdNum = "1"; // 默认值
-        size_t underscorePos = serverId_.find_last_of('_');
-        if (underscorePos != std::string::npos && underscorePos + 1 < serverId_.length()) {
-            serverIdNum = serverId_.substr(underscorePos + 1);
-        }
-        
-        // 尝试将提取的数字部分转换为整数
-        try {
-            serverNumericId_ = std::stoull(serverIdNum);
-        } catch (const std::exception& e) {
-            LOG_WARN("Failed to parse server numeric ID from %s, using default value 1", serverIdNum.c_str());
-            serverNumericId_ = 1;
-        }
-        
         sessionThreadPool_ = std::make_unique<SessionThreadPool>(threadPoolSize_);
         
-        LOG_DEBUG("TCP server initialized - Port: %d, ThreadPool: %d, MaxQueuePerWorker: %d, ServerId: %s, ServerNumericId: %llu", 
-                 port_, threadPoolSize_, maxQueueSizePerWorker_, serverId_.c_str(), serverNumericId_);
+        LOG_DEBUG("TCP server initialized - Port: %d, ThreadPool: %d, MaxQueuePerWorker: %d", 
+                 port_,  threadPoolSize_, maxQueueSizePerWorker_);
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR("Error initializing TCP server: %s", e.what());
@@ -149,8 +125,8 @@ bool TcpServer::sendToPlayer(const std::string& playerSessionId, uint32_t msgId,
     return connectionManager_.sendToPlayer(playerSessionId, msgId, data);
 }
 
-bool TcpServer::sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data) {
-    return connectionManager_.sendToGateway(gatewayId, msgId, data);
+bool TcpServer::sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data, const std::string& sessionId) {
+    return connectionManager_.sendToGateway(gatewayId, msgId, data, sessionId);
 }
 
 void TcpServer::broadcastMessage(uint32_t msgId, const std::string& data) {
@@ -288,8 +264,14 @@ void TcpServer::enqueuePacket(std::shared_ptr<uv::TcpConnection> connection,
         LOG_WARN("[WARNING] Session %s thread queue is full, dropping packet", packet.SessionId());
         return;
     }
-    sessionThreadPool_->enqueueBySession(packet.SessionId(), [this, connection, packet, gatewayId]() mutable {
-        processPacket(connection, packet, gatewayId);
+    std::weak_ptr<uv::TcpConnection> weakConnection = connection;
+    sessionThreadPool_->enqueueBySession(packet.SessionId(), [this, weakConnection, packet, gatewayId]() mutable {
+        auto conn = weakConnection.lock();
+        if (conn) {
+            processPacket(conn, packet, gatewayId);
+        } else {
+            LOG_WARN("Connection expired while processing packet for session: %s", packet.SessionId());
+        }
     });
 }
 
@@ -309,7 +291,7 @@ void TcpServer::processPacket(std::shared_ptr<uv::TcpConnection> connection, uv:
             hexPayload += hexChar;
         }
         
-        LOG_INFO("Received message from %s: msgId=0x%x, dataSize=%d, payload=%s", gatewayId.c_str(), packet.MsgId(), packet.DataSize(), hexPayload.c_str());
+        LOG_DEBUG("Received message from %s: msgId=0x%x, dataSize=%d, payload=%s", gatewayId.c_str(), packet.MsgId(), packet.DataSize(), hexPayload.c_str());
         // 通过消息路由器处理消息
         if (messageRouter_) {
             // 特殊处理登录请求，先创建基础PlayerSession
@@ -326,7 +308,12 @@ void TcpServer::processPacket(std::shared_ptr<uv::TcpConnection> connection, uv:
                 if (!playerSessionId.empty()) {
                     auto playerSession = connectionManager_.getPlayerSession(playerSessionId);
                     if (!playerSession) {
-                        LOG_WARN("Received message for unregistered session %s, ignoring", playerSessionId.c_str());
+                        proto::KickPlayerNotify notify;
+                        notify.set_sessionid(playerSessionId);
+                        notify.set_reason(ErrorCode::INVALID_SESSION); 
+                        sendToGateway(gatewayId, Protocol::SC_KICK_PLAYER_NOTIFY, notify.SerializeAsString(), playerSessionId);
+                        LOG_INFO("Sent kick notification for unregistered session %s via gateway %s", 
+                                 playerSessionId.c_str(), gatewayId.c_str());
                         return;
                     }
                     connectionManager_.updatePlayerSessionActiveTime(playerSessionId);
@@ -361,14 +348,12 @@ bool TcpServer::sendMessageToConnection(std::weak_ptr<uv::TcpConnection> connect
         
         responsePacket->pack(data.c_str(), data.size(), msgId, sessionId.c_str());
         
-        // 异步发送消息
-        sendResponseAsync(conn, responsePacket, "message");
+        sendResponse(conn, responsePacket, "message");
         
         if (sessionId.empty()) {
             LOG_DEBUG("Queued system message to gateway, msgId: 0x%x, size: %d", msgId, data.size());
         } else {
-            LOG_DEBUG("Queued message to session %s, msgId: 0x%x, size: %d", 
-                     sessionId.c_str(), msgId, data.size());
+            LOG_DEBUG("Queued message to session %s, msgId: 0x%x, size: %d",sessionId.c_str(), msgId, data.size());
         }
         return true;
     } catch (const std::exception& e) {
@@ -384,13 +369,10 @@ void TcpServer::sendResponse(std::shared_ptr<uv::TcpConnection> connection,
         return;
     }
     
-    connection->write(responsePacket->Buffer().c_str(), responsePacket->PacketSize(), 
-        [type](uv::WriteInfo& info) {
-            if (info.status) {
-                LOG_ERROR("Write error for %s response: %s", 
-                          type.c_str(), uv::EventLoop::GetErrorMessage(info.status));
-            } else {
-                LOG_DEBUG("Direct %s response sent successfully", type.c_str());
+    connection->writeInLoop(responsePacket->Buffer().c_str(), responsePacket->PacketSize(), 
+        [responsePacket, type](uv::WriteInfo& info) {
+            if (info.status < 0) {
+                LOG_ERROR("Write failed for %s: %s", type.c_str(), uv_strerror(info.status));
             }
         });
 }
@@ -398,20 +380,18 @@ void TcpServer::sendResponse(std::shared_ptr<uv::TcpConnection> connection,
 void TcpServer::sendResponseAsync(std::shared_ptr<uv::TcpConnection> connection, 
                                  std::shared_ptr<uv::Packet> responsePacket, 
                                  const std::string& type) {
-    // 确保在事件循环线程中执行写操作
-    loop_->runInThisLoop([connection, responsePacket, type]() {
-        if (!connection || !connection->isConnected()) {
+    std::weak_ptr<uv::TcpConnection> weakConn = connection;
+    loop_->runInThisLoop([weakConn, responsePacket, type]() {
+        auto conn = weakConn.lock();
+        if (!conn || !conn->isConnected()) {
             LOG_WARN("Connection is not available for sending %s response", type.c_str());
             return;
         }
         
-        connection->write(responsePacket->Buffer().c_str(), responsePacket->PacketSize(), 
-            [type](uv::WriteInfo& info) {
-                if (info.status) {
-                    LOG_ERROR("Write error for %s response: %s", 
-                              type.c_str(), uv::EventLoop::GetErrorMessage(info.status));
-                } else {
-                    LOG_DEBUG("Async %s response sent successfully", type.c_str());
+        conn->writeInLoop(responsePacket->Buffer().c_str(), responsePacket->PacketSize(), 
+            [responsePacket](uv::WriteInfo& info) {
+                if (info.status < 0) {
+                    LOG_ERROR("Write failed: %s", uv_strerror(info.status));
                 }
             });
     });

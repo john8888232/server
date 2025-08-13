@@ -3,9 +3,7 @@
 
 #include <memory>
 #include <unordered_map>
-#include <string>
 #include <typeindex>
-#include <typeinfo>
 #include <stdexcept>
 
 // 依赖注入容器

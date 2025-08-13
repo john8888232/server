@@ -34,7 +34,6 @@ public:
     void stop();
 };
 
-// 模板方法实现
 template<typename F>
 void ThreadPool::enqueue(F&& f) {
     {

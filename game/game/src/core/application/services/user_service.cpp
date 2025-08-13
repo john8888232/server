@@ -1,5 +1,5 @@
 #include "user_service.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "core/infrastructure/common/error_code.h"
 #include "core/infrastructure/repositories/user_repository_impl.h"
 
@@ -38,8 +38,8 @@ UserService::LoginResult UserService::processLogin(const proto::LoginReq& reques
             return result;
         }
         
-        // 使用仓库查找用户
-        auto user = userRepository_->findByLoginName(request.loginname());
+        // 使用仓库查找用户，传递游戏类型
+        auto user = userRepository_->findByLoginName(request.loginname(), request.game_type());
         
         // 检查用户是否存在
         if (!user) {

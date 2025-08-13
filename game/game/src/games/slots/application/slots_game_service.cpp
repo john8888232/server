@@ -1,11 +1,9 @@
 #include "slots_game_service.h"
 #include "games/game_factory.h"
-#include "games/game_def.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include <random>
 #include <sstream>
 #include <chrono>
-#include "core/infrastructure/common/app_context.h"
 #include <iomanip>
 #include <ctime>
 

@@ -8,13 +8,11 @@
 
 extern DependencyContainer& getDependencyContainer();
 
-// 构造函数
 AppContext::AppContext() : eventLoop_(nullptr) {
 }
 
 bool AppContext::initialize() {
     try {
-        // 从依赖容器获取依赖
         auto& container = getDependencyContainer();
         configManager_ = container.resolve<ConfigManager>();
         if (!configManager_) {
@@ -46,7 +44,6 @@ bool AppContext::initialize() {
             serverId = serverConfig["consul"]["service_id"].get<std::string>();
         }
         
-        // 使用依赖容器中的AppContext实例，而不是shared_from_this()
         if (!gameManager_->initialize(serverId, messageRouter_)) {
             LOG_ERROR("Failed to initialize game manager");
             return false;
@@ -59,9 +56,6 @@ bool AppContext::initialize() {
             LOG_ERROR("Failed to get game registry from game manager");
             return false;
         }
-        
-        // 建立ConfigManager和GameRegistry之间的配置更新链路
-        setupConfigUpdateChain(gameRegistry);
         
         // 创建并初始化Consul客户端
         consulClient_ = std::make_shared<ConsulClient>(eventLoop_);
@@ -113,13 +107,6 @@ bool AppContext::initialize() {
         return false;
     }
 }
-
-void AppContext::setupConfigUpdateChain(std::shared_ptr<GameRegistry> gameRegistry) {
-    // 配置更新链已精简，现在配置重载由ConfigManager::reloadGameConfigFromRedis()直接处理
-    LOG_INFO("Config update chain setup - using simplified direct reload mechanism");
-}
-
-
 
 bool AppContext::registerAllHandlers() {
     LOG_INFO("Registering all message handlers...");

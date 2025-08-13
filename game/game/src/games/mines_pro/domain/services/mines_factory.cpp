@@ -1,6 +1,6 @@
 #include "mines_factory.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "third_party/nlohmann/json.hpp"
 #include "games/mines_pro/application/mines_game_service.h"
 #include "games/mines_pro/interfaces/handlers/mines_place_bet_handler.h"
 #include "games/mines_pro/interfaces/handlers/mines_auto_cash_handler.h"
@@ -130,7 +130,7 @@ GameFactory::GameCreationMode MinesFactory::getGameCreationMode() const {
     return GameCreationMode::GLOBAL_SHARED;
 }
 
-void MinesFactory::onConfigUpdated(const json& oldConfig, const json& newConfig) {
+void MinesFactory::onConfigUpdated(const json& newConfig) {
     LOG_INFO("MinesFactory received config update");
     
     auto& container = getDependencyContainer();

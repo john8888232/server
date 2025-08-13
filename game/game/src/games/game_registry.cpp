@@ -1,11 +1,6 @@
 #include "game_registry.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <algorithm>
-#include "core/infrastructure/common/app_context.h"
-#include "core/infrastructure/persistence/database_factory.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "core/infrastructure/common/dependency_container.h"
-
-// 包含内置游戏的游戏工厂
 #include "mines_pro/domain/services/mines_factory.h"
 
 extern DependencyContainer& getDependencyContainer();
@@ -174,7 +169,6 @@ void GameRegistry::onGameConfigUpdated(const std::string& gameType) {
         return;
     }
     
-    // 从依赖容器获取AppContext
     auto& container = getDependencyContainer();
     auto appContext = container.resolve<AppContext>();
     if (!appContext) {
@@ -204,14 +198,13 @@ void GameRegistry::onGameConfigUpdated(const std::string& gameType) {
     factory->setConfig(configIt->second);
     
     // 触发配置更新通知
-    factory->onConfigUpdated(oldConfig, configIt->second);
+    factory->onConfigUpdated(configIt->second);
     
     LOG_INFO("Game config update completed for: %s", gameType.c_str());
 }
 
 bool GameRegistry::initializeBuiltInGames() {
     try {
-        // 从依赖容器获取AppContext和DatabaseFactory
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {

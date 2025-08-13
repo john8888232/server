@@ -1,8 +1,8 @@
 #include "mines_grid.h"
 #include <chrono>
 #include <set>
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "third_party/nlohmann/json.hpp"
 
 using json = nlohmann::json;
 

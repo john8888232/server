@@ -2,11 +2,10 @@
 #include "core/infrastructure/common/error_code.h"
 #include <algorithm>
 #include <cstring>
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <third_party/libuv_cpp/include/Packet.hpp>
-#include <third_party/libuv_cpp/include/Timer.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "third_party/libuv_cpp/include/Timer.hpp"
 #include "protocol.h"
-#include "core/infrastructure/proto/game.pb.h"
+#include "core/infrastructure/protogen/game.pb.h"
 
 ConnectionManager::ConnectionManager(uv::EventLoop* loop) 
     : loop_(loop), sessionCleanupTimer_(nullptr) {
@@ -327,7 +326,7 @@ bool ConnectionManager::sendToPlayer(const std::string& playerSessionId, uint32_
     return sendMessageCallback_(conn, msgId, data, playerSessionId);
 }
 
-bool ConnectionManager::sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data) {
+bool ConnectionManager::sendToGateway(const std::string& gatewayId, uint32_t msgId, const std::string& data, const std::string& sessionId) {
     if (!sendMessageCallback_) {
         LOG_ERROR("Send message callback not set");
         return false;
@@ -342,7 +341,7 @@ bool ConnectionManager::sendToGateway(const std::string& gatewayId, uint32_t msg
         return false;
     }
     
-    return sendMessageCallback_(it->second->connection, msgId, data, "");
+    return sendMessageCallback_(it->second->connection, msgId, data, sessionId);
 }
 
 std::vector<std::string> ConnectionManager::getPlayerSessionsByGateway(const std::string& gatewayId) {

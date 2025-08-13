@@ -1,0 +1,27 @@
+# Gateway服务配置文件 - 连接外部服务版本
+gateway:
+  host: "0.0.0.0"
+  ws_port: 5600          # WebSocket端口
+  tcp_port: 5700         # TCP端口（预留）
+  max_connections: 10000 # 最大连接数
+  read_timeout: 30       # 读取超时（秒）
+  write_timeout: 30      # 写入超时（秒）
+  pprof_port: 6060      # pprof性能监控端口
+
+# Consul服务发现配置 - 连接外部Consul
+consul:
+  address: "${CONSUL_ADDR}"  # 由环境变量替换
+  service_name: "gameserver"
+  query_interval: 5      # 查询间隔（秒）
+
+# Redis配置 - 连接外部Redis
+redis:
+  address: "${REDIS_ADDR}"     # 由环境变量替换
+  password: "${REDIS_PASSWORD}" # 由环境变量替换
+  db: 0                   # 数据库编号
+  pool_size: 100          # 连接池大小
+
+# 日志配置
+logger:
+  level: "${LOG_LEVEL:-info}"  # 日志级别: debug, info, warn, error
+  file: "/app/logs/gateway"  # 日志文件基础路径

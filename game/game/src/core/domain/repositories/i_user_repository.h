@@ -11,7 +11,7 @@ public:
     virtual ~IUserRepository() = default;
     
     // 根据登录名查找用户
-    virtual std::shared_ptr<User> findByLoginName(const std::string& loginName) = 0;
+    virtual std::shared_ptr<User> findByLoginName(const std::string& loginName, const std::string& gameType = "") = 0;
     
     // 根据登录名和令牌验证用户
     virtual bool validateUserToken(const std::string& loginName, const std::string& token) = 0;

@@ -58,7 +58,6 @@ PROTOBUF_CONSTEXPR PlayerInfo::PlayerInfo(
   , /*decltype(_impl_.currency_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.loginname_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.balance_)*/0
-  , /*decltype(_impl_.vip_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct PlayerInfoDefaultTypeInternal {
   PROTOBUF_CONSTEXPR PlayerInfoDefaultTypeInternal()
@@ -192,6 +191,8 @@ PROTOBUF_CONSTEXPR GameSnapshotNotify::GameSnapshotNotify(
     /*decltype(_impl_.result_)*/{}
   , /*decltype(_impl_.roundid_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.gametype_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.seed_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.hash_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.status_)*/0
   , /*decltype(_impl_.remaintime_)*/0
   , /*decltype(_impl_.curmulti_)*/0
@@ -227,8 +228,9 @@ PROTOBUF_CONSTEXPR MinesPlaceBetRes::MinesPlaceBetRes(
     /*decltype(_impl_.message_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.roundid_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.bet_)*/nullptr
-  , /*decltype(_impl_.balance_)*/0
   , /*decltype(_impl_.code_)*/0
+  , /*decltype(_impl_.playtype_)*/0
+  , /*decltype(_impl_.balance_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct MinesPlaceBetResDefaultTypeInternal {
   PROTOBUF_CONSTEXPR MinesPlaceBetResDefaultTypeInternal()
@@ -344,6 +346,7 @@ PROTOBUF_CONSTEXPR MinesStartJettonNotify::MinesStartJettonNotify(
     ::_pbi::ConstantInitialized): _impl_{
     /*decltype(_impl_.roundid_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.gametype_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
+  , /*decltype(_impl_.hash_)*/{&::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized{}}
   , /*decltype(_impl_.duration_)*/0
   , /*decltype(_impl_._cached_size_)*/{}} {}
 struct MinesStartJettonNotifyDefaultTypeInternal {
@@ -427,7 +430,6 @@ const uint32_t TableStruct_game_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.username_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.nickname_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.avatar_),
-  PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.vip_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.balance_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.currency_),
   PROTOBUF_FIELD_OFFSET(::proto::PlayerInfo, _impl_.loginname_),
@@ -514,6 +516,8 @@ const uint32_t TableStruct_game_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   PROTOBUF_FIELD_OFFSET(::proto::GameSnapshotNotify, _impl_.curindex_),
   PROTOBUF_FIELD_OFFSET(::proto::GameSnapshotNotify, _impl_.curmulti_),
   PROTOBUF_FIELD_OFFSET(::proto::GameSnapshotNotify, _impl_.result_),
+  PROTOBUF_FIELD_OFFSET(::proto::GameSnapshotNotify, _impl_.seed_),
+  PROTOBUF_FIELD_OFFSET(::proto::GameSnapshotNotify, _impl_.hash_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::proto::MinesPlaceBetReq, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -535,6 +539,7 @@ const uint32_t TableStruct_game_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   PROTOBUF_FIELD_OFFSET(::proto::MinesPlaceBetRes, _impl_.roundid_),
   PROTOBUF_FIELD_OFFSET(::proto::MinesPlaceBetRes, _impl_.bet_),
   PROTOBUF_FIELD_OFFSET(::proto::MinesPlaceBetRes, _impl_.balance_),
+  PROTOBUF_FIELD_OFFSET(::proto::MinesPlaceBetRes, _impl_.playtype_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::proto::MinesAutoCashReq, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -609,6 +614,7 @@ const uint32_t TableStruct_game_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(pro
   PROTOBUF_FIELD_OFFSET(::proto::MinesStartJettonNotify, _impl_.roundid_),
   PROTOBUF_FIELD_OFFSET(::proto::MinesStartJettonNotify, _impl_.gametype_),
   PROTOBUF_FIELD_OFFSET(::proto::MinesStartJettonNotify, _impl_.duration_),
+  PROTOBUF_FIELD_OFFSET(::proto::MinesStartJettonNotify, _impl_.hash_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::proto::GameStopJettonNotify, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -637,27 +643,27 @@ static const ::_pbi::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protode
   { 0, -1, -1, sizeof(::proto::BetRecord)},
   { 8, -1, -1, sizeof(::proto::ReckonRecord)},
   { 17, -1, -1, sizeof(::proto::PlayerInfo)},
-  { 30, -1, -1, sizeof(::proto::PlayerInfoSnap)},
-  { 39, -1, -1, sizeof(::proto::GameResult)},
-  { 48, -1, -1, sizeof(::proto::HeartBeat)},
-  { 55, -1, -1, sizeof(::proto::LoginReq)},
-  { 66, -1, -1, sizeof(::proto::LoginResp)},
-  { 76, -1, -1, sizeof(::proto::LogoutReq)},
-  { 83, -1, -1, sizeof(::proto::LogoutRes)},
-  { 92, -1, -1, sizeof(::proto::KickPlayerNotify)},
-  { 100, -1, -1, sizeof(::proto::GameSnapshotNotify)},
-  { 113, -1, -1, sizeof(::proto::MinesPlaceBetReq)},
-  { 123, -1, -1, sizeof(::proto::MinesPlaceBetRes)},
-  { 134, -1, -1, sizeof(::proto::MinesAutoCashReq)},
-  { 145, -1, -1, sizeof(::proto::MinesAutoCashRes)},
-  { 157, -1, -1, sizeof(::proto::MinesCashReq)},
-  { 166, -1, -1, sizeof(::proto::MinesCashRes)},
-  { 178, -1, -1, sizeof(::proto::MinesCancelBetReq)},
-  { 187, -1, -1, sizeof(::proto::MinesCancelBetRes)},
-  { 199, -1, -1, sizeof(::proto::MinesStartJettonNotify)},
-  { 208, -1, -1, sizeof(::proto::GameStopJettonNotify)},
-  { 216, -1, -1, sizeof(::proto::GameRankInfoNotify)},
-  { 225, -1, -1, sizeof(::proto::ConnClose)},
+  { 29, -1, -1, sizeof(::proto::PlayerInfoSnap)},
+  { 38, -1, -1, sizeof(::proto::GameResult)},
+  { 47, -1, -1, sizeof(::proto::HeartBeat)},
+  { 54, -1, -1, sizeof(::proto::LoginReq)},
+  { 65, -1, -1, sizeof(::proto::LoginResp)},
+  { 75, -1, -1, sizeof(::proto::LogoutReq)},
+  { 82, -1, -1, sizeof(::proto::LogoutRes)},
+  { 91, -1, -1, sizeof(::proto::KickPlayerNotify)},
+  { 99, -1, -1, sizeof(::proto::GameSnapshotNotify)},
+  { 114, -1, -1, sizeof(::proto::MinesPlaceBetReq)},
+  { 124, -1, -1, sizeof(::proto::MinesPlaceBetRes)},
+  { 136, -1, -1, sizeof(::proto::MinesAutoCashReq)},
+  { 147, -1, -1, sizeof(::proto::MinesAutoCashRes)},
+  { 159, -1, -1, sizeof(::proto::MinesCashReq)},
+  { 168, -1, -1, sizeof(::proto::MinesCashRes)},
+  { 180, -1, -1, sizeof(::proto::MinesCancelBetReq)},
+  { 189, -1, -1, sizeof(::proto::MinesCancelBetRes)},
+  { 201, -1, -1, sizeof(::proto::MinesStartJettonNotify)},
+  { 211, -1, -1, sizeof(::proto::GameStopJettonNotify)},
+  { 219, -1, -1, sizeof(::proto::GameRankInfoNotify)},
+  { 228, -1, -1, sizeof(::proto::ConnClose)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -691,59 +697,61 @@ const char descriptor_table_protodef_game_2eproto[] PROTOBUF_SECTION_VARIABLE(pr
   "\n\ngame.proto\022\005proto\"-\n\tBetRecord\022\020\n\010play"
   "Type\030\001 \001(\005\022\016\n\006amount\030\002 \001(\001\"\?\n\014ReckonReco"
   "rd\022\020\n\010playType\030\001 \001(\005\022\016\n\006amount\030\002 \001(\001\022\r\n\005"
-  "multi\030\003 \001(\001\"\203\001\n\nPlayerInfo\022\020\n\010username\030\001"
-  " \001(\t\022\020\n\010nickname\030\002 \001(\t\022\016\n\006avatar\030\003 \001(\t\022\013"
-  "\n\003vip\030\004 \001(\005\022\017\n\007balance\030\005 \001(\001\022\020\n\010currency"
-  "\030\006 \001(\t\022\021\n\tloginname\030\007 \001(\t\"w\n\016PlayerInfoS"
-  "nap\022\037\n\004info\030\001 \001(\0132\021.proto.PlayerInfo\022\036\n\004"
-  "bets\030\002 \003(\0132\020.proto.BetRecord\022$\n\007reckons\030"
-  "\003 \003(\0132\023.proto.ReckonRecord\":\n\nGameResult"
-  "\022\016\n\006result\030\001 \001(\005\022\r\n\005multi\030\002 \001(\001\022\r\n\005index"
-  "\030\003 \001(\005\"\036\n\tHeartBeat\022\021\n\ttimestamp\030\001 \001(\t\"c"
-  "\n\010LoginReq\022\021\n\tloginname\030\001 \001(\t\022\r\n\005token\030\002"
-  " \001(\t\022\021\n\tgame_type\030\003 \001(\t\022\017\n\007version\030\004 \001(\r"
-  "\022\021\n\tclient_ip\030\005 \001(\t\"^\n\tLoginResp\022\021\n\tlogi"
-  "nname\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003 \001"
-  "(\t\022\037\n\004info\030\004 \001(\0132\021.proto.PlayerInfo\"\036\n\tL"
-  "ogoutReq\022\021\n\tloginname\030\001 \001(\t\"9\n\tLogoutRes"
-  "\022\021\n\tloginname\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\013\n\003msg"
-  "\030\003 \001(\t\"5\n\020KickPlayerNotify\022\021\n\tsessionId\030"
-  "\001 \001(\t\022\016\n\006reason\030\002 \001(\005\"\242\001\n\022GameSnapshotNo"
-  "tify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022"
-  "\016\n\006status\030\003 \001(\005\022\022\n\nremainTime\030\004 \001(\005\022\020\n\010c"
-  "urIndex\030\005 \001(\005\022\020\n\010curMulti\030\006 \001(\001\022!\n\006resul"
-  "t\030\007 \003(\0132\021.proto.GameResult\"X\n\020MinesPlace"
-  "BetReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002 \001"
-  "(\t\022\020\n\010playType\030\003 \001(\005\022\016\n\006amount\030\004 \001(\001\"r\n\020"
-  "MinesPlaceBetRes\022\014\n\004code\030\001 \001(\005\022\017\n\007messag"
-  "e\030\002 \001(\t\022\017\n\007roundId\030\003 \001(\t\022\035\n\003bet\030\004 \001(\0132\020."
-  "proto.BetRecord\022\017\n\007balance\030\005 \001(\001\"f\n\020Mine"
-  "sAutoCashReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007round"
-  "Id\030\002 \001(\t\022\020\n\010playType\030\003 \001(\005\022\016\n\006enable\030\004 \001"
-  "(\005\022\014\n\004grid\030\005 \001(\005\"r\n\020MinesAutoCashRes\022\017\n\007"
-  "roundId\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003"
-  " \001(\t\022\016\n\006enable\030\004 \001(\005\022\014\n\004grid\030\005 \001(\005\022\020\n\010pl"
-  "ayType\030\006 \001(\005\"D\n\014MinesCashReq\022\021\n\tloginnam"
-  "e\030\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010playType\030\003 \001"
-  "(\005\"\206\001\n\014MinesCashRes\022\017\n\007roundId\030\001 \001(\t\022\014\n\004"
-  "code\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022#\n\006reckon\030\004 "
-  "\001(\0132\023.proto.ReckonRecord\022\017\n\007balance\030\005 \001("
-  "\001\022\020\n\010playType\030\006 \001(\005\"I\n\021MinesCancelBetReq"
-  "\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010"
-  "playType\030\003 \001(\005\"|\n\021MinesCancelBetRes\022\017\n\007r"
-  "oundId\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003 "
-  "\001(\t\022\024\n\014refundAmount\030\004 \001(\001\022\017\n\007balance\030\005 \001"
-  "(\001\022\020\n\010playType\030\006 \001(\005\"M\n\026MinesStartJetton"
-  "Notify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gametype\030\002 \001("
-  "\t\022\020\n\010duration\030\003 \001(\005\"9\n\024GameStopJettonNot"
-  "ify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\"_"
-  "\n\022GameRankInfoNotify\022\017\n\007roundId\030\001 \001(\t\022\020\n"
-  "\010gameType\030\002 \001(\t\022&\n\007players\030\003 \003(\0132\025.proto"
-  ".PlayerInfoSnap\"\013\n\tConnCloseb\006proto3"
+  "multi\030\003 \001(\001\"v\n\nPlayerInfo\022\020\n\010username\030\001 "
+  "\001(\t\022\020\n\010nickname\030\002 \001(\t\022\016\n\006avatar\030\003 \001(\t\022\017\n"
+  "\007balance\030\005 \001(\001\022\020\n\010currency\030\006 \001(\t\022\021\n\tlogi"
+  "nname\030\007 \001(\t\"w\n\016PlayerInfoSnap\022\037\n\004info\030\001 "
+  "\001(\0132\021.proto.PlayerInfo\022\036\n\004bets\030\002 \003(\0132\020.p"
+  "roto.BetRecord\022$\n\007reckons\030\003 \003(\0132\023.proto."
+  "ReckonRecord\":\n\nGameResult\022\016\n\006result\030\001 \001"
+  "(\005\022\r\n\005multi\030\002 \001(\001\022\r\n\005index\030\003 \001(\005\"\036\n\tHear"
+  "tBeat\022\021\n\ttimestamp\030\001 \001(\t\"c\n\010LoginReq\022\021\n\t"
+  "loginname\030\001 \001(\t\022\r\n\005token\030\002 \001(\t\022\021\n\tgame_t"
+  "ype\030\003 \001(\t\022\017\n\007version\030\004 \001(\r\022\021\n\tclient_ip\030"
+  "\005 \001(\t\"^\n\tLoginResp\022\021\n\tloginname\030\001 \001(\t\022\014\n"
+  "\004code\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022\037\n\004info\030\004 \001"
+  "(\0132\021.proto.PlayerInfo\"\036\n\tLogoutReq\022\021\n\tlo"
+  "ginname\030\001 \001(\t\"9\n\tLogoutRes\022\021\n\tloginname\030"
+  "\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\013\n\003msg\030\003 \001(\t\"5\n\020Kick"
+  "PlayerNotify\022\021\n\tsessionId\030\001 \001(\t\022\016\n\006reaso"
+  "n\030\002 \001(\005\"\276\001\n\022GameSnapshotNotify\022\017\n\007roundI"
+  "d\030\001 \001(\t\022\020\n\010gameType\030\002 \001(\t\022\016\n\006status\030\003 \001("
+  "\005\022\022\n\nremainTime\030\004 \001(\005\022\020\n\010curIndex\030\005 \001(\005\022"
+  "\020\n\010curMulti\030\006 \001(\001\022!\n\006result\030\007 \003(\0132\021.prot"
+  "o.GameResult\022\014\n\004seed\030\010 \001(\t\022\014\n\004hash\030\t \001(\t"
+  "\"X\n\020MinesPlaceBetReq\022\021\n\tloginname\030\001 \001(\t\022"
+  "\017\n\007roundId\030\002 \001(\t\022\020\n\010playType\030\003 \001(\005\022\016\n\006am"
+  "ount\030\004 \001(\001\"\204\001\n\020MinesPlaceBetRes\022\014\n\004code\030"
+  "\001 \001(\005\022\017\n\007message\030\002 \001(\t\022\017\n\007roundId\030\003 \001(\t\022"
+  "\035\n\003bet\030\004 \001(\0132\020.proto.BetRecord\022\017\n\007balanc"
+  "e\030\005 \001(\001\022\020\n\010playType\030\006 \001(\005\"f\n\020MinesAutoCa"
+  "shReq\022\021\n\tloginname\030\001 \001(\t\022\017\n\007roundId\030\002 \001("
+  "\t\022\020\n\010playType\030\003 \001(\005\022\016\n\006enable\030\004 \001(\005\022\014\n\004g"
+  "rid\030\005 \001(\005\"r\n\020MinesAutoCashRes\022\017\n\007roundId"
+  "\030\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022\016\n"
+  "\006enable\030\004 \001(\005\022\014\n\004grid\030\005 \001(\005\022\020\n\010playType\030"
+  "\006 \001(\005\"D\n\014MinesCashReq\022\021\n\tloginname\030\001 \001(\t"
+  "\022\017\n\007roundId\030\002 \001(\t\022\020\n\010playType\030\003 \001(\005\"\206\001\n\014"
+  "MinesCashRes\022\017\n\007roundId\030\001 \001(\t\022\014\n\004code\030\002 "
+  "\001(\005\022\017\n\007message\030\003 \001(\t\022#\n\006reckon\030\004 \001(\0132\023.p"
+  "roto.ReckonRecord\022\017\n\007balance\030\005 \001(\001\022\020\n\010pl"
+  "ayType\030\006 \001(\005\"I\n\021MinesCancelBetReq\022\021\n\tlog"
+  "inname\030\001 \001(\t\022\017\n\007roundId\030\002 \001(\t\022\020\n\010playTyp"
+  "e\030\003 \001(\005\"|\n\021MinesCancelBetRes\022\017\n\007roundId\030"
+  "\001 \001(\t\022\014\n\004code\030\002 \001(\005\022\017\n\007message\030\003 \001(\t\022\024\n\014"
+  "refundAmount\030\004 \001(\001\022\017\n\007balance\030\005 \001(\001\022\020\n\010p"
+  "layType\030\006 \001(\005\"[\n\026MinesStartJettonNotify\022"
+  "\017\n\007roundId\030\001 \001(\t\022\020\n\010gametype\030\002 \001(\t\022\020\n\010du"
+  "ration\030\003 \001(\005\022\014\n\004hash\030\004 \001(\t\"9\n\024GameStopJe"
+  "ttonNotify\022\017\n\007roundId\030\001 \001(\t\022\020\n\010gameType\030"
+  "\002 \001(\t\"_\n\022GameRankInfoNotify\022\017\n\007roundId\030\001"
+  " \001(\t\022\020\n\010gameType\030\002 \001(\t\022&\n\007players\030\003 \003(\0132"
+  "\025.proto.PlayerInfoSnap\"\013\n\tConnCloseb\006pro"
+  "to3"
   ;
 static ::_pbi::once_flag descriptor_table_game_2eproto_once;
 const ::_pbi::DescriptorTable descriptor_table_game_2eproto = {
-    false, false, 2076, descriptor_table_protodef_game_2eproto,
+    false, false, 2123, descriptor_table_protodef_game_2eproto,
     "game.proto",
     &descriptor_table_game_2eproto_once, nullptr, 0, 24,
     schemas, file_default_instances, TableStruct_game_2eproto::offsets,
@@ -1262,7 +1270,6 @@ PlayerInfo::PlayerInfo(const PlayerInfo& from)
     , decltype(_impl_.currency_){}
     , decltype(_impl_.loginname_){}
     , decltype(_impl_.balance_){}
-    , decltype(_impl_.vip_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -1306,9 +1313,7 @@ PlayerInfo::PlayerInfo(const PlayerInfo& from)
     _this->_impl_.loginname_.Set(from._internal_loginname(), 
       _this->GetArenaForAllocation());
   }
-  ::memcpy(&_impl_.balance_, &from._impl_.balance_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.vip_) -
-    reinterpret_cast<char*>(&_impl_.balance_)) + sizeof(_impl_.vip_));
+  _this->_impl_.balance_ = from._impl_.balance_;
   // @@protoc_insertion_point(copy_constructor:proto.PlayerInfo)
 }
 
@@ -1323,7 +1328,6 @@ inline void PlayerInfo::SharedCtor(
     , decltype(_impl_.currency_){}
     , decltype(_impl_.loginname_){}
     , decltype(_impl_.balance_){0}
-    , decltype(_impl_.vip_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.username_.InitDefault();
@@ -1381,9 +1385,7 @@ void PlayerInfo::Clear() {
   _impl_.avatar_.ClearToEmpty();
   _impl_.currency_.ClearToEmpty();
   _impl_.loginname_.ClearToEmpty();
-  ::memset(&_impl_.balance_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.vip_) -
-      reinterpret_cast<char*>(&_impl_.balance_)) + sizeof(_impl_.vip_));
+  _impl_.balance_ = 0;
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -1420,14 +1422,6 @@ const char* PlayerInfo::_InternalParse(const char* ptr, ::_pbi::ParseContext* ct
           ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
           CHK_(::_pbi::VerifyUTF8(str, "proto.PlayerInfo.avatar"));
-        } else
-          goto handle_unusual;
-        continue;
-      // int32 vip = 4;
-      case 4:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
-          _impl_.vip_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
-          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -1516,12 +1510,6 @@ uint8_t* PlayerInfo::_InternalSerialize(
       "proto.PlayerInfo.avatar");
     target = stream->WriteStringMaybeAliased(
         3, this->_internal_avatar(), target);
-  }
-
-  // int32 vip = 4;
-  if (this->_internal_vip() != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::_pbi::WireFormatLite::WriteInt32ToArray(4, this->_internal_vip(), target);
   }
 
   // double balance = 5;
@@ -1614,11 +1602,6 @@ size_t PlayerInfo::ByteSizeLong() const {
     total_size += 1 + 8;
   }
 
-  // int32 vip = 4;
-  if (this->_internal_vip() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_vip());
-  }
-
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
@@ -1659,9 +1642,6 @@ void PlayerInfo::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PRO
   if (raw_balance != 0) {
     _this->_internal_set_balance(from._internal_balance());
   }
-  if (from._internal_vip() != 0) {
-    _this->_internal_set_vip(from._internal_vip());
-  }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -1701,12 +1681,7 @@ void PlayerInfo::InternalSwap(PlayerInfo* other) {
       &_impl_.loginname_, lhs_arena,
       &other->_impl_.loginname_, rhs_arena
   );
-  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(PlayerInfo, _impl_.vip_)
-      + sizeof(PlayerInfo::_impl_.vip_)
-      - PROTOBUF_FIELD_OFFSET(PlayerInfo, _impl_.balance_)>(
-          reinterpret_cast<char*>(&_impl_.balance_),
-          reinterpret_cast<char*>(&other->_impl_.balance_));
+  swap(_impl_.balance_, other->_impl_.balance_);
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata PlayerInfo::GetMetadata() const {
@@ -3864,6 +3839,8 @@ GameSnapshotNotify::GameSnapshotNotify(const GameSnapshotNotify& from)
       decltype(_impl_.result_){from._impl_.result_}
     , decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
+    , decltype(_impl_.seed_){}
+    , decltype(_impl_.hash_){}
     , decltype(_impl_.status_){}
     , decltype(_impl_.remaintime_){}
     , decltype(_impl_.curmulti_){}
@@ -3887,6 +3864,22 @@ GameSnapshotNotify::GameSnapshotNotify(const GameSnapshotNotify& from)
     _this->_impl_.gametype_.Set(from._internal_gametype(), 
       _this->GetArenaForAllocation());
   }
+  _impl_.seed_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.seed_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_seed().empty()) {
+    _this->_impl_.seed_.Set(from._internal_seed(), 
+      _this->GetArenaForAllocation());
+  }
+  _impl_.hash_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.hash_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_hash().empty()) {
+    _this->_impl_.hash_.Set(from._internal_hash(), 
+      _this->GetArenaForAllocation());
+  }
   ::memcpy(&_impl_.status_, &from._impl_.status_,
     static_cast<size_t>(reinterpret_cast<char*>(&_impl_.curindex_) -
     reinterpret_cast<char*>(&_impl_.status_)) + sizeof(_impl_.curindex_));
@@ -3901,6 +3894,8 @@ inline void GameSnapshotNotify::SharedCtor(
       decltype(_impl_.result_){arena}
     , decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
+    , decltype(_impl_.seed_){}
+    , decltype(_impl_.hash_){}
     , decltype(_impl_.status_){0}
     , decltype(_impl_.remaintime_){0}
     , decltype(_impl_.curmulti_){0}
@@ -3914,6 +3909,14 @@ inline void GameSnapshotNotify::SharedCtor(
   _impl_.gametype_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.gametype_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.seed_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.seed_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.hash_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.hash_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
@@ -3931,6 +3934,8 @@ inline void GameSnapshotNotify::SharedDtor() {
   _impl_.result_.~RepeatedPtrField();
   _impl_.roundid_.Destroy();
   _impl_.gametype_.Destroy();
+  _impl_.seed_.Destroy();
+  _impl_.hash_.Destroy();
 }
 
 void GameSnapshotNotify::SetCachedSize(int size) const {
@@ -3946,6 +3951,8 @@ void GameSnapshotNotify::Clear() {
   _impl_.result_.Clear();
   _impl_.roundid_.ClearToEmpty();
   _impl_.gametype_.ClearToEmpty();
+  _impl_.seed_.ClearToEmpty();
+  _impl_.hash_.ClearToEmpty();
   ::memset(&_impl_.status_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&_impl_.curindex_) -
       reinterpret_cast<char*>(&_impl_.status_)) + sizeof(_impl_.curindex_));
@@ -4020,6 +4027,26 @@ const char* GameSnapshotNotify::_InternalParse(const char* ptr, ::_pbi::ParseCon
             CHK_(ptr);
             if (!ctx->DataAvailable(ptr)) break;
           } while (::PROTOBUF_NAMESPACE_ID::internal::ExpectTag<58>(ptr));
+        } else
+          goto handle_unusual;
+        continue;
+      // string seed = 8;
+      case 8:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 66)) {
+          auto str = _internal_mutable_seed();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "proto.GameSnapshotNotify.seed"));
+        } else
+          goto handle_unusual;
+        continue;
+      // string hash = 9;
+      case 9:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 74)) {
+          auto str = _internal_mutable_hash();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "proto.GameSnapshotNotify.hash"));
         } else
           goto handle_unusual;
         continue;
@@ -4108,6 +4135,26 @@ uint8_t* GameSnapshotNotify::_InternalSerialize(
         InternalWriteMessage(7, repfield, repfield.GetCachedSize(), target, stream);
   }
 
+  // string seed = 8;
+  if (!this->_internal_seed().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_seed().data(), static_cast<int>(this->_internal_seed().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "proto.GameSnapshotNotify.seed");
+    target = stream->WriteStringMaybeAliased(
+        8, this->_internal_seed(), target);
+  }
+
+  // string hash = 9;
+  if (!this->_internal_hash().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_hash().data(), static_cast<int>(this->_internal_hash().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "proto.GameSnapshotNotify.hash");
+    target = stream->WriteStringMaybeAliased(
+        9, this->_internal_hash(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -4143,6 +4190,20 @@ size_t GameSnapshotNotify::ByteSizeLong() const {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_gametype());
+  }
+
+  // string seed = 8;
+  if (!this->_internal_seed().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_seed());
+  }
+
+  // string hash = 9;
+  if (!this->_internal_hash().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_hash());
   }
 
   // int32 status = 3;
@@ -4194,6 +4255,12 @@ void GameSnapshotNotify::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, con
   if (!from._internal_gametype().empty()) {
     _this->_internal_set_gametype(from._internal_gametype());
   }
+  if (!from._internal_seed().empty()) {
+    _this->_internal_set_seed(from._internal_seed());
+  }
+  if (!from._internal_hash().empty()) {
+    _this->_internal_set_hash(from._internal_hash());
+  }
   if (from._internal_status() != 0) {
     _this->_internal_set_status(from._internal_status());
   }
@@ -4237,6 +4304,14 @@ void GameSnapshotNotify::InternalSwap(GameSnapshotNotify* other) {
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.gametype_, lhs_arena,
       &other->_impl_.gametype_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.seed_, lhs_arena,
+      &other->_impl_.seed_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.hash_, lhs_arena,
+      &other->_impl_.hash_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
       PROTOBUF_FIELD_OFFSET(GameSnapshotNotify, _impl_.curindex_)
@@ -4601,8 +4676,9 @@ MinesPlaceBetRes::MinesPlaceBetRes(const MinesPlaceBetRes& from)
       decltype(_impl_.message_){}
     , decltype(_impl_.roundid_){}
     , decltype(_impl_.bet_){nullptr}
-    , decltype(_impl_.balance_){}
     , decltype(_impl_.code_){}
+    , decltype(_impl_.playtype_){}
+    , decltype(_impl_.balance_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
@@ -4625,9 +4701,9 @@ MinesPlaceBetRes::MinesPlaceBetRes(const MinesPlaceBetRes& from)
   if (from._internal_has_bet()) {
     _this->_impl_.bet_ = new ::proto::BetRecord(*from._impl_.bet_);
   }
-  ::memcpy(&_impl_.balance_, &from._impl_.balance_,
-    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.code_) -
-    reinterpret_cast<char*>(&_impl_.balance_)) + sizeof(_impl_.code_));
+  ::memcpy(&_impl_.code_, &from._impl_.code_,
+    static_cast<size_t>(reinterpret_cast<char*>(&_impl_.balance_) -
+    reinterpret_cast<char*>(&_impl_.code_)) + sizeof(_impl_.balance_));
   // @@protoc_insertion_point(copy_constructor:proto.MinesPlaceBetRes)
 }
 
@@ -4639,8 +4715,9 @@ inline void MinesPlaceBetRes::SharedCtor(
       decltype(_impl_.message_){}
     , decltype(_impl_.roundid_){}
     , decltype(_impl_.bet_){nullptr}
-    , decltype(_impl_.balance_){0}
     , decltype(_impl_.code_){0}
+    , decltype(_impl_.playtype_){0}
+    , decltype(_impl_.balance_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
   _impl_.message_.InitDefault();
@@ -4685,9 +4762,9 @@ void MinesPlaceBetRes::Clear() {
     delete _impl_.bet_;
   }
   _impl_.bet_ = nullptr;
-  ::memset(&_impl_.balance_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&_impl_.code_) -
-      reinterpret_cast<char*>(&_impl_.balance_)) + sizeof(_impl_.code_));
+  ::memset(&_impl_.code_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&_impl_.balance_) -
+      reinterpret_cast<char*>(&_impl_.code_)) + sizeof(_impl_.balance_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -4738,6 +4815,14 @@ const char* MinesPlaceBetRes::_InternalParse(const char* ptr, ::_pbi::ParseConte
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 41)) {
           _impl_.balance_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<double>(ptr);
           ptr += sizeof(double);
+        } else
+          goto handle_unusual;
+        continue;
+      // int32 playType = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 48)) {
+          _impl_.playtype_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
         } else
           goto handle_unusual;
         continue;
@@ -4813,6 +4898,12 @@ uint8_t* MinesPlaceBetRes::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteDoubleToArray(5, this->_internal_balance(), target);
   }
 
+  // int32 playType = 6;
+  if (this->_internal_playtype() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteInt32ToArray(6, this->_internal_playtype(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -4850,6 +4941,16 @@ size_t MinesPlaceBetRes::ByteSizeLong() const {
         *_impl_.bet_);
   }
 
+  // int32 code = 1;
+  if (this->_internal_code() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_code());
+  }
+
+  // int32 playType = 6;
+  if (this->_internal_playtype() != 0) {
+    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_playtype());
+  }
+
   // double balance = 5;
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_balance = this->_internal_balance();
@@ -4857,11 +4958,6 @@ size_t MinesPlaceBetRes::ByteSizeLong() const {
   memcpy(&raw_balance, &tmp_balance, sizeof(tmp_balance));
   if (raw_balance != 0) {
     total_size += 1 + 8;
-  }
-
-  // int32 code = 1;
-  if (this->_internal_code() != 0) {
-    total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(this->_internal_code());
   }
 
   return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
@@ -4892,15 +4988,18 @@ void MinesPlaceBetRes::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const
     _this->_internal_mutable_bet()->::proto::BetRecord::MergeFrom(
         from._internal_bet());
   }
+  if (from._internal_code() != 0) {
+    _this->_internal_set_code(from._internal_code());
+  }
+  if (from._internal_playtype() != 0) {
+    _this->_internal_set_playtype(from._internal_playtype());
+  }
   static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
   double tmp_balance = from._internal_balance();
   uint64_t raw_balance;
   memcpy(&raw_balance, &tmp_balance, sizeof(tmp_balance));
   if (raw_balance != 0) {
     _this->_internal_set_balance(from._internal_balance());
-  }
-  if (from._internal_code() != 0) {
-    _this->_internal_set_code(from._internal_code());
   }
   _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
@@ -4930,8 +5029,8 @@ void MinesPlaceBetRes::InternalSwap(MinesPlaceBetRes* other) {
       &other->_impl_.roundid_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(MinesPlaceBetRes, _impl_.code_)
-      + sizeof(MinesPlaceBetRes::_impl_.code_)
+      PROTOBUF_FIELD_OFFSET(MinesPlaceBetRes, _impl_.balance_)
+      + sizeof(MinesPlaceBetRes::_impl_.balance_)
       - PROTOBUF_FIELD_OFFSET(MinesPlaceBetRes, _impl_.bet_)>(
           reinterpret_cast<char*>(&_impl_.bet_),
           reinterpret_cast<char*>(&other->_impl_.bet_));
@@ -6994,6 +7093,7 @@ MinesStartJettonNotify::MinesStartJettonNotify(const MinesStartJettonNotify& fro
   new (&_impl_) Impl_{
       decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
+    , decltype(_impl_.hash_){}
     , decltype(_impl_.duration_){}
     , /*decltype(_impl_._cached_size_)*/{}};
 
@@ -7014,6 +7114,14 @@ MinesStartJettonNotify::MinesStartJettonNotify(const MinesStartJettonNotify& fro
     _this->_impl_.gametype_.Set(from._internal_gametype(), 
       _this->GetArenaForAllocation());
   }
+  _impl_.hash_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.hash_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_hash().empty()) {
+    _this->_impl_.hash_.Set(from._internal_hash(), 
+      _this->GetArenaForAllocation());
+  }
   _this->_impl_.duration_ = from._impl_.duration_;
   // @@protoc_insertion_point(copy_constructor:proto.MinesStartJettonNotify)
 }
@@ -7025,6 +7133,7 @@ inline void MinesStartJettonNotify::SharedCtor(
   new (&_impl_) Impl_{
       decltype(_impl_.roundid_){}
     , decltype(_impl_.gametype_){}
+    , decltype(_impl_.hash_){}
     , decltype(_impl_.duration_){0}
     , /*decltype(_impl_._cached_size_)*/{}
   };
@@ -7035,6 +7144,10 @@ inline void MinesStartJettonNotify::SharedCtor(
   _impl_.gametype_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
     _impl_.gametype_.Set("", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.hash_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    _impl_.hash_.Set("", GetArenaForAllocation());
   #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
@@ -7051,6 +7164,7 @@ inline void MinesStartJettonNotify::SharedDtor() {
   GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
   _impl_.roundid_.Destroy();
   _impl_.gametype_.Destroy();
+  _impl_.hash_.Destroy();
 }
 
 void MinesStartJettonNotify::SetCachedSize(int size) const {
@@ -7065,6 +7179,7 @@ void MinesStartJettonNotify::Clear() {
 
   _impl_.roundid_.ClearToEmpty();
   _impl_.gametype_.ClearToEmpty();
+  _impl_.hash_.ClearToEmpty();
   _impl_.duration_ = 0;
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
@@ -7100,6 +7215,16 @@ const char* MinesStartJettonNotify::_InternalParse(const char* ptr, ::_pbi::Pars
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
           _impl_.duration_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // string hash = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 34)) {
+          auto str = _internal_mutable_hash();
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(ptr);
+          CHK_(::_pbi::VerifyUTF8(str, "proto.MinesStartJettonNotify.hash"));
         } else
           goto handle_unusual;
         continue;
@@ -7158,6 +7283,16 @@ uint8_t* MinesStartJettonNotify::_InternalSerialize(
     target = ::_pbi::WireFormatLite::WriteInt32ToArray(3, this->_internal_duration(), target);
   }
 
+  // string hash = 4;
+  if (!this->_internal_hash().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_hash().data(), static_cast<int>(this->_internal_hash().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "proto.MinesStartJettonNotify.hash");
+    target = stream->WriteStringMaybeAliased(
+        4, this->_internal_hash(), target);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -7186,6 +7321,13 @@ size_t MinesStartJettonNotify::ByteSizeLong() const {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
         this->_internal_gametype());
+  }
+
+  // string hash = 4;
+  if (!this->_internal_hash().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_hash());
   }
 
   // int32 duration = 3;
@@ -7217,6 +7359,9 @@ void MinesStartJettonNotify::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg,
   if (!from._internal_gametype().empty()) {
     _this->_internal_set_gametype(from._internal_gametype());
   }
+  if (!from._internal_hash().empty()) {
+    _this->_internal_set_hash(from._internal_hash());
+  }
   if (from._internal_duration() != 0) {
     _this->_internal_set_duration(from._internal_duration());
   }
@@ -7246,6 +7391,10 @@ void MinesStartJettonNotify::InternalSwap(MinesStartJettonNotify* other) {
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
       &_impl_.gametype_, lhs_arena,
       &other->_impl_.gametype_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &_impl_.hash_, lhs_arena,
+      &other->_impl_.hash_, rhs_arena
   );
   swap(_impl_.duration_, other->_impl_.duration_);
 }

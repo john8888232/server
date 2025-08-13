@@ -3,7 +3,7 @@
 
 #include <memory>
 #include "third_party/libuv_cpp/include/uv11.hpp"
-#include "../common/config_manager.h"
+#include "core/infrastructure/common/config_manager.h"
 
 class AppContext;
 

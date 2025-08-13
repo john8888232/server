@@ -1,5 +1,5 @@
 #include "user_repository_impl.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "core/infrastructure/persistence/database_factory.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
@@ -7,26 +7,22 @@
 extern DependencyContainer& getDependencyContainer();
 
 UserRepositoryImpl::UserRepositoryImpl() {
-    // MySQL实现特定的初始化
 }
 
 UserRepositoryImpl::~UserRepositoryImpl() {
-    // MySQL实现特定的清理
 }
 
-std::shared_ptr<MySQLClient> UserRepositoryImpl::getMySQLClient() {
-    // 从依赖容器获取DatabaseFactory
+std::shared_ptr<MySQLClientV2> UserRepositoryImpl::getMySQLClient() {
     auto& container = getDependencyContainer();
     auto dbFactory = container.resolve<DatabaseFactory>();
     if (!dbFactory) {
         LOG_ERROR("DatabaseFactory not available in dependency container");
         return nullptr;
     }
-    return dbFactory->getMySQLClient();
+    return dbFactory->getMySQLClientV2();
 }
 
 std::shared_ptr<RedisClient> UserRepositoryImpl::getRedisClient() {
-    // 从依赖容器获取DatabaseFactory
     auto& container = getDependencyContainer();
     auto dbFactory = container.resolve<DatabaseFactory>();
     if (!dbFactory) {
@@ -36,38 +32,48 @@ std::shared_ptr<RedisClient> UserRepositoryImpl::getRedisClient() {
     return dbFactory->getRedisClient();
 }
 
-std::shared_ptr<User> UserRepositoryImpl::findByLoginName(const std::string& loginName) {
+std::shared_ptr<User> UserRepositoryImpl::findByLoginName(const std::string& loginName, const std::string& gameType) {
     auto mysqlClient = getMySQLClient();
     if (!mysqlClient) {
         LOG_ERROR("Failed to get MySQL client for finding user by login name");
         return nullptr;
     }
     
+    // 根据游戏类型确定头像表名
+    std::string avatarTableName = "mines_pro_player";
+    if (gameType == "mines_pro") {
+        avatarTableName = "mines_pro_player";
+    }
     const std::string sql = 
-        "SELECT player_id, avatar, username, login_name, currency, nick_name, amount, vip_level, player_status "
-        "FROM sys_player WHERE login_name = ?";
+        "SELECT p.player_id, a.avatar_url avatarUrl, p.username, p.login_name, m.currency, p.nick_name, "
+        "COALESCE(b.amount, 0.00) as amount, p.player_status, p.merchant_id "
+        "FROM sys_player p "
+        "LEFT JOIN " + avatarTableName + " mp ON p.player_id = mp.player_id "
+        "LEFT JOIN sys_avatar a ON mp.avatar = a.id "
+        "LEFT JOIN sys_player_balance b ON p.player_id = b.player_id "
+        "LEFT JOIN sys_user m ON p.merchant_id = m.superior_id "
+        "WHERE p.login_name = ?";
     
-    int64_t playerId = 0;
-    int avatarId = 1;
+    uint64_t playerId = 0;
+    std::string avatarUrl;
     std::string username;
     std::string retrievedLoginName;
     std::string currency;
     std::string nickName;
     double amount = 0;
-    int vipLevel = 0;
     int playerStatus = -1;
-    
-    // 执行查询并处理结果
-    mysqlClient->queryWithCallback(sql, {loginName}, [&](const mysqlx::Row& row) {
-        playerId = row[0].get<int64_t>();
-        avatarId = row[1].get<int>();
-        username = row[2].get<std::string>();
-        retrievedLoginName = row[3].get<std::string>();
-        currency = row[4].get<std::string>();
-        nickName = row[5].get<std::string>();
-        amount = row[6].get<double>();
-        vipLevel = row[7].get<int>();
-        playerStatus = row[8].get<int>();
+    int merchantId = 0;
+
+    mysqlClient->queryWithCallback(sql, {loginName}, [&](sql::ResultSet* row) {
+        playerId = row->getInt64(1);
+        avatarUrl = row->getString(2);
+        username = row->getString(3);
+        retrievedLoginName = row->getString(4);
+        currency = row->getString(5);
+        nickName = row->getString(6);
+        amount = row->getDouble(7);
+        playerStatus = row->getInt(8);
+        merchantId = row->getInt(9);
     });
     
     // 检查用户是否存在
@@ -78,8 +84,8 @@ std::shared_ptr<User> UserRepositoryImpl::findByLoginName(const std::string& log
     
     // 创建用户对象
     User::Status userStatus = static_cast<User::Status>(playerStatus);
-    return std::make_shared<User>(playerId, avatarId, retrievedLoginName, username, nickName, 
-                                 amount, vipLevel, currency, userStatus);
+    return std::make_shared<User>(playerId, avatarUrl, retrievedLoginName, username, nickName, 
+                                 amount, currency, userStatus, merchantId);
 }
 
 bool UserRepositoryImpl::validateUserToken(const std::string& loginName, const std::string& token) {
@@ -92,8 +98,8 @@ bool UserRepositoryImpl::validateUserToken(const std::string& loginName, const s
     const std::string sql = "SELECT token FROM sys_player WHERE login_name = ?";
     std::string storedToken;
     
-    mysqlClient->queryWithCallback(sql, {loginName}, [&](const mysqlx::Row& row) {
-        storedToken = row[0].get<std::string>();
+    mysqlClient->queryWithCallback(sql, {loginName}, [&](sql::ResultSet* row) {
+        storedToken = row->getString(1);
     });
     
     if (storedToken.empty()) {
@@ -118,24 +124,29 @@ bool UserRepositoryImpl::updateLastLogin(const std::string& loginName, const std
             LOG_ERROR("Failed to get MySQL client for updating last login");
             return false;
         }
-        
         // 准备SQL更新
-        const std::string sql = 
-            "UPDATE sys_player SET "
-            "last_login_day = NOW(), "
-            "last_login_ip = ?, "
-            "first_login_day = COALESCE(first_login_day, NOW()) "
-            "WHERE login_name = ?";
+        const std::string sql = R"(
+            UPDATE 
+                sys_player 
+            SET 
+                last_login_date = NOW(), 
+                last_login_ip = ? 
+            WHERE login_name = ?)";
+        LOG_INFO("Executing UPDATE SQL: %s with params: ip='%s', login_name='%s'", 
+                 sql.c_str(), ipAddress.c_str(), loginName.c_str());
         
-        // 执行更新
-        uint64_t affectedRows = mysqlClient->executeUpdate(sql, {ipAddress, loginName});
+        int64_t result = mysqlClient->safeExecuteUpdate(sql, {ipAddress, loginName}, 1);
         
-        if (affectedRows == 0) {
-            LOG_WARN("No rows updated when updating last login for player: %s", loginName.c_str());
+        LOG_INFO("UPDATE result for user %s: %ld rows affected", loginName.c_str(), result);
+        
+        if (result == -1) {
+            LOG_ERROR("Failed to update last login for player: %s after retries", loginName.c_str());
             return false;
         }
-        
-        LOG_DEBUG("Updated last login info for player: %s", loginName.c_str());
+        if (result == 0) {
+            LOG_ERROR("UPDATE returned 0 rows for user: %s - user exists but UPDATE failed!", loginName.c_str());
+            return false;
+        };
         return true;
     } catch (const std::exception& e) {
         LOG_ERROR("Exception updating last login: %s", e.what());
@@ -151,7 +162,6 @@ bool UserRepositoryImpl::updateUserRedis(const std::string& loginName) {
     }
     std::string key = "player:" + loginName + ":onlineInfo";
     try {
-        // 从依赖容器获取AppContext
         auto& container = getDependencyContainer();
         auto appContext = container.resolve<AppContext>();
         if (!appContext) {

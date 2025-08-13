@@ -49,3 +49,15 @@ func (cm *ClientManager) Len() int {
 	defer cm.mutex.RUnlock()
 	return len(cm.clients)
 }
+
+// GetAllClients 获取所有客户端的副本（用于重新关联）
+func (cm *ClientManager) GetAllClients() []*Client {
+	cm.mutex.RLock()
+	defer cm.mutex.RUnlock()
+
+	clients := make([]*Client, 0, len(cm.clients))
+	for _, client := range cm.clients {
+		clients = append(clients, client)
+	}
+	return clients
+}

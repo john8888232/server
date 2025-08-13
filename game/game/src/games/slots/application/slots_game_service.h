@@ -8,7 +8,6 @@ class GameFactory;
 
 class SlotsGameService : public IGameService {
 public:
-    // 构造函数接受factory参数
     explicit SlotsGameService(GameFactory* factory);
     virtual ~SlotsGameService();
     

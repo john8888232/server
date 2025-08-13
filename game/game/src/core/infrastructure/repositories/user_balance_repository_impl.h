@@ -2,7 +2,7 @@
 #define USER_BALANCE_REPOSITORY_IMPL_H
 
 #include <memory>
-#include <vector>
+#include <atomic>
 #include "core/domain/repositories/i_user_balance_repository.h"
 #include "core/infrastructure/persistence/database_factory.h"
 
@@ -10,26 +10,27 @@
 class UserBalanceRepositoryImpl : public IUserBalanceRepository {
 public:
     UserBalanceRepositoryImpl();
-    
     ~UserBalanceRepositoryImpl() override;
-    
-    // 批量更新玩家余额
-    bool updatePlayerBalancesBatch(
-        const std::vector<PlayerBalanceUpdate>& updates, 
-        std::vector<PlayerBalanceUpdateResult>& results) override;
-    
-    // 更新单个玩家的余额
-    PlayerBalanceUpdateResult updatePlayerBalance(
-        const PlayerBalanceUpdate& update) override;
-    
+
+    // 获取玩家当前余额
+    double getPlayerBalance(const uint64_t& playerId) override;
+
+     // 更新单个玩家余额
+    bool updatePlayerBalance(const PlayerRoundInfo& info, uint32_t reason) override;
+
 private:
-    // 单个玩家的余额更新（独立事务）
-    bool updateSinglePlayerBalance(
-        const PlayerBalanceUpdate& update,
-        PlayerBalanceUpdateResult& result);
+    // 生成订单ID
+    std::string generateOrderId();
+    
+    // 生成交易ID
+    std::string generateTransId();
         
     // 数据库工厂
     std::shared_ptr<DatabaseFactory> dbFactory_;
+    
+    // 序列号生成器
+    static std::atomic<uint64_t> orderSequence_;
+    static std::atomic<uint64_t> transSequence_;
 };
 
 #endif // USER_BALANCE_REPOSITORY_IMPL_H 

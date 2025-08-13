@@ -1,14 +1,20 @@
 #include "user_balance_repository_impl.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <cmath>
-#include "core/infrastructure/persistence/database_factory.h"
-#include "core/infrastructure/persistence/mysql_client.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
+#include "core/infrastructure/persistence/mysql_clientV2.h"
+#include "core/infrastructure/persistence/mysql_data_def.h"
 #include "core/infrastructure/common/dependency_container.h"
+#include "core/infrastructure/common/app_context.h"
+#include "games/game_def.h"
+#include <unordered_map>
 
 extern DependencyContainer& getDependencyContainer();
 
 // 小数精度误差容忍范围 - 增大以处理浮点数精度问题
 constexpr double DECIMAL_EPSILON = 0.01;
+
+// 静态成员初始化
+std::atomic<uint64_t> UserBalanceRepositoryImpl::orderSequence_{0};
+std::atomic<uint64_t> UserBalanceRepositoryImpl::transSequence_{0};
 
 // 辅助函数：将double四舍五入到2位小数，与MySQL的DECIMAL(32,2)匹配
 double roundToTwoDecimals(double value) {
@@ -16,7 +22,6 @@ double roundToTwoDecimals(double value) {
 }
 
 UserBalanceRepositoryImpl::UserBalanceRepositoryImpl() {
-    // 从依赖容器获取DatabaseFactory
     auto& container = getDependencyContainer();
     dbFactory_ = container.resolve<DatabaseFactory>();
     
@@ -26,169 +31,230 @@ UserBalanceRepositoryImpl::UserBalanceRepositoryImpl() {
 }
 
 UserBalanceRepositoryImpl::~UserBalanceRepositoryImpl() {
-    // MySQL实现特定的清理
 }
 
-bool UserBalanceRepositoryImpl::updatePlayerBalancesBatch(
-    const std::vector<PlayerBalanceUpdate>& updates, 
-    std::vector<PlayerBalanceUpdateResult>& results) 
-{
-    results.clear();
+std::string UserBalanceRepositoryImpl::generateOrderId() {
+    // 雪花算法: 1位符号位(0) + 41位时间戳 + 10位机器ID + 12位序列号
+    static const uint64_t EPOCH = 1640995200000; // 2022-01-01 00:00:00 UTC
     
-    int totalCount = updates.size();
-    int successCount = 0;
-    int failCount = 0;
+    // 获取服务器ID作为机器ID
+    uint64_t machineId = 1; // 默认值
     
-    LOG_INFO("Starting batch update of balances for %d players", totalCount);
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (appContext) {
+        auto tcpServer = appContext->getTcpServer();
+        if (tcpServer) {
+            machineId = tcpServer->getServerNumericId();
+            // 确保machineId在10位以内 (0-1023)
+            machineId &= 0x3FF;
+        }
+    }
     
-    // 处理每个玩家的余额更新，每个玩家使用独立事务
-    for (const auto& update : updates) {
-        PlayerBalanceUpdateResult result;
-        result.loginName = update.loginName;
-        result.originalBalance = update.originalBalance;
-        result.newBalance = update.newBalance;
+    auto now = std::chrono::system_clock::now();
+    uint64_t timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    
+    uint64_t seq = orderSequence_.fetch_add(1) & 0xFFF; // 12位序列号
+    uint64_t snowflakeId = ((timestamp - EPOCH) << 22) | (machineId << 12) | seq;
+    
+    return "ORD" + std::to_string(snowflakeId);
+}
+
+std::string UserBalanceRepositoryImpl::generateTransId() {
+    static const uint64_t EPOCH = 1640995200000;
+    
+    // 获取服务器ID作为机器ID
+    uint64_t machineId = 1; // 默认值
+    
+    auto& container = getDependencyContainer();
+    auto appContext = container.resolve<AppContext>();
+    if (appContext) {
+        auto tcpServer = appContext->getTcpServer();
+        if (tcpServer) {
+            machineId = tcpServer->getServerNumericId();
+            // 确保machineId在10位以内 (0-1023)
+            machineId &= 0x3FF;
+        }
+    }
+    
+    auto now = std::chrono::system_clock::now();
+    uint64_t timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+    
+    uint64_t seq = transSequence_.fetch_add(1) & 0xFFF;
+    uint64_t snowflakeId = ((timestamp - EPOCH) << 22) | (machineId << 12) | seq;
+    
+    return "TXN" + std::to_string(snowflakeId);
+}
+
+double UserBalanceRepositoryImpl::getPlayerBalance(const uint64_t& playerId) {
+    if (!dbFactory_) {
+        LOG_ERROR("Database factory not available for getPlayerBalance");
+        return -1.0;
+    }
+    
+    auto mysqlClient = dbFactory_->getMySQLClientV2();
+    if (!mysqlClient) {
+        LOG_ERROR("Failed to get MySQL client for getPlayerBalance");
+        return -1.0;
+    }
+    
+    try {
+        double balance = -1.0;
+        std::string sql = "SELECT CAST(b.amount AS CHAR) FROM sys_player_balance b WHERE b.player_id = ?";
+        std::vector<MySQLParamValue> params = {playerId};
         
-        // 对每个玩家使用独立事务处理
-        bool success = updateSinglePlayerBalance(update, result);
+        LOG_DEBUG("Executing getPlayerBalance query: %s with params [%llu]", 
+                 sql.c_str(), playerId);
         
-        if (success) {
-            successCount++;
-        } else {
-            failCount++;
-            LOG_ERROR("Failed to update balance for player %s: %s", 
-                      update.loginName.c_str(), result.errorMessage.c_str());
+        bool found = false;
+        mysqlClient->queryWithCallback(sql, params, [&](sql::ResultSet* row) {
+            if (row && !row->isNull(1)) {
+                std::string amountStr = row->getString(1);
+                balance = std::stod(amountStr);
+                found = true;
+                LOG_DEBUG("Found player %lld balance: %s (%.2f)", 
+                    playerId, amountStr.c_str(), balance);
+            }
+        });
+        
+        if (!found) {
+            LOG_WARN("Player %lld not found in database", playerId);
+            return -1.0;
         }
         
-        results.push_back(result);
+        return balance;
+        
+    } catch (const std::exception& e) {
+        LOG_ERROR("Exception while getting player %lld balance: %s", 
+            playerId, e.what());
+        return -1.0;
     }
-    
-    LOG_INFO("Completed batch update of balances: total=%d, success=%d, fail=%d", 
-             totalCount, successCount, failCount);
-    
-    // 即使部分玩家失败，整体操作也视为完成
-    return true;
 }
 
-PlayerBalanceUpdateResult UserBalanceRepositoryImpl::updatePlayerBalance(
-    const PlayerBalanceUpdate& update)
-{
-    PlayerBalanceUpdateResult result;
-    result.loginName = update.loginName;
-    result.originalBalance = update.originalBalance;
-    result.newBalance = update.newBalance;
-    
-    updateSinglePlayerBalance(update, result);
-    return result;
-}
-
-bool UserBalanceRepositoryImpl::updateSinglePlayerBalance(
-    const PlayerBalanceUpdate& update,
-    PlayerBalanceUpdateResult& result)
-{
+// 更新单个玩家余额
+bool UserBalanceRepositoryImpl::updatePlayerBalance(const PlayerRoundInfo& info, uint32_t reason) {
     if (!dbFactory_) {
-        result.success = false;
-        result.errorMessage = "Database factory not available";
+        LOG_ERROR("Database factory not available for player balance update");
         return false;
     }
     
-    auto mysqlClient = dbFactory_->getMySQLClient();
-    
+    auto mysqlClient = dbFactory_->getMySQLClientV2();
     if (!mysqlClient) {
-        result.success = false;
-        result.errorMessage = "Failed to get MySQL client";
+        LOG_ERROR("Failed to get MySQL client for player balance update");
+        return false;
+    }
+    if (info.bets_.empty()) {
+        LOG_ERROR("No bet information found in PlayerRoundInfo");
         return false;
     }
     
-    bool success = false;
+    const auto& firstBet = info.bets_[0];
+
+    uint64_t playerId = info.info_.player_id_;
+    double betAmount = firstBet.amount_;
     
-    // 使用事务进行余额更新
-    success = mysqlClient->executeTransaction([&](MySQLClient& client) {
+    LOG_INFO("Starting balance update for player %lu, bet amount: %.2f", playerId, betAmount);
+    
+    // 使用安全事务处理单个玩家的扣款
+    bool success = mysqlClient->safeExecuteTransaction([&](MySQLClientV2& client) {
         try {
-            // 读取当前余额（使用SELECT FOR UPDATE锁定记录）
-            double currentBalance = 0.0;
-            std::string updateTime;
+            // 1. 首先获取当前余额
+            std::string selectBalanceSql = "SELECT CAST(amount AS CHAR) FROM sys_player_balance WHERE player_id = ?";
+            std::vector<MySQLParamValue> selectParams;
+            selectParams.push_back(static_cast<int32_t>(playerId));
             
-            // 查询当前余额 - 使用CAST读取精确值
-            std::string querySql = "SELECT CAST(amount AS CHAR), update_time FROM sys_player WHERE login_name = ? FOR UPDATE";
-            std::vector<MySQLParamValue> queryParams = {update.loginName};
+            double beforeAmount = 0.0;
+            bool balanceFound = false;
             
-            LOG_INFO("Executing SELECT FOR UPDATE: %s with params [%s]", 
-                     querySql.c_str(), update.loginName.c_str());
-            
-            bool foundPlayer = false;
-            client.queryWithCallback(querySql, queryParams, [&](const mysqlx::Row& row) {
-                std::string amountStr = row[0].get<std::string>();
-                currentBalance = std::stod(amountStr);
-                updateTime = row[1].get<std::string>();
-                foundPlayer = true;
-                LOG_INFO("SELECT result: amount=%s, update_time=%s", 
-                         amountStr.c_str(), updateTime.c_str());
+            client.queryWithCallback(selectBalanceSql, selectParams, [&](sql::ResultSet* row) {
+                if (row && !row->isNull(1)) {
+                    std::string balanceStr = row->getString(1);
+                    beforeAmount = std::stod(balanceStr);
+                    balanceFound = true;
+                }
             });
             
-            if (!foundPlayer) {
-                result.success = false;
-                result.errorMessage = "Player not found";
+            if (!balanceFound) {
+                LOG_ERROR("Player %lu balance not found", playerId);
                 return false;
             }
             
-            // 检查原始余额是否匹配（允许小数精度误差）
-            if (std::abs(currentBalance - update.originalBalance) > DECIMAL_EPSILON) {
-                result.success = false;
-                result.actualBalance = currentBalance;
-                result.errorMessage = "Original balance mismatch: expected " + 
-                                     std::to_string(update.originalBalance) + 
-                                     ", actual " + std::to_string(currentBalance);
+            double newBalance = beforeAmount - betAmount;
+            
+            // 2. 更新玩家余额
+            std::string updateBalanceSql = "UPDATE sys_player_balance SET amount = ? WHERE player_id = ?";
+            std::vector<MySQLParamValue> balanceParams;
+            balanceParams.push_back(newBalance);
+            balanceParams.push_back(static_cast<int32_t>(playerId));
+            
+            int64_t updateCount = client.safeExecuteUpdate(updateBalanceSql, balanceParams, 1);
+            if (updateCount == -1) {
+                LOG_ERROR("Failed to update balance for player %lu", playerId);
                 return false;
             }
             
-            // 将新余额四舍五入到2位小数，确保与MySQL的DECIMAL(32,2)精度匹配
-            double roundedNewBalance = roundToTwoDecimals(update.newBalance);
+            // 2. 生成订单ID
+            std::string orderId = generateOrderId();
             
-            // 使用参数化查询更新余额
-            std::string updateSql = "UPDATE sys_player SET amount = ?, update_time = NOW() WHERE login_name = ?";
-            std::vector<MySQLParamValue> updateParams = {roundedNewBalance, update.loginName};
+            // 3. 插入订单记录
+            std::string orderSql = "INSERT INTO mines_pro_order (round_id, player_id, order_no, play_type, "
+                                  "bet_amount, win_amount, win_multiple, bet_time, settle_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            std::vector<MySQLParamValue> orderParams;
+            orderParams.push_back(std::string("TBD")); // round_id 将在游戏处理时更新
+            orderParams.push_back(static_cast<int32_t>(playerId));
+            orderParams.push_back(orderId);
+            orderParams.push_back(static_cast<int32_t>(firstBet.playType_));
+            orderParams.push_back(betAmount);
+            orderParams.push_back(0.0); // win_amount 初始为0
+            orderParams.push_back(0.0); // win_multiple 初始为0
             
-            LOG_INFO("Executing UPDATE: %s with params [%.2f, %s]", 
-                     updateSql.c_str(), roundedNewBalance, update.loginName.c_str());
+            // 格式化时间
+            auto time_t = std::chrono::system_clock::to_time_t(firstBet.bet_time_);
+            char timeStr[64];
+            std::strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", std::localtime(&time_t));
+            orderParams.push_back(std::string(timeStr));
+            orderParams.push_back(std::string("")); // settle_time 暂时为空
             
-            uint64_t rowsAffected = client.executeUpdate(updateSql, updateParams);
-            
-            LOG_INFO("UPDATE result: rows affected = %lu", rowsAffected);
-            
-            if (rowsAffected != 1) {
-                result.success = false;
-                result.actualBalance = currentBalance;
-                result.errorMessage = "Failed to update player balance, rows affected: " + std::to_string(rowsAffected);
+            int64_t orderInsertCount = client.safeExecuteUpdate(orderSql, orderParams, 1);
+            if (orderInsertCount == -1) {
+                LOG_ERROR("Failed to insert order for player %lu", playerId);
                 return false;
             }
             
-            // 验证更新是否成功，并获取实际更新后的值 - 使用CAST读取精确值
-            double updatedBalance = 0.0;
-            std::string updatedBalanceStr;
-            std::string verifySQL = "SELECT CAST(amount AS CHAR) FROM sys_player WHERE login_name = ?";
+            // 4. 插入交易记录
+            std::string transactionSql = "INSERT INTO player_change_record (player_id, order_no, change_type, "
+                                        "before_amount, change_amount, after_amount, description, oper_ip, "
+                                        "create_by, update_by, remark, status, merchant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            std::vector<MySQLParamValue> transactionParams;
+            transactionParams.push_back(static_cast<int32_t>(playerId));
+            transactionParams.push_back(orderId);
+            transactionParams.push_back(static_cast<int32_t>(reason)); // reason: 3 for bet deduction
+            transactionParams.push_back(beforeAmount);
+            transactionParams.push_back(-betAmount); // 负数表示扣款
+            transactionParams.push_back(newBalance);
+            transactionParams.push_back(std::string("mines_pro_bet_deduction"));
+            transactionParams.push_back(info.info_.client_ip_);
+            transactionParams.push_back(std::string("system"));
+            transactionParams.push_back(std::string("")); // update_by 为空
+            transactionParams.push_back(std::string("bet_deduction"));
+            transactionParams.push_back(static_cast<int32_t>(1)); // status: 1 for active
+            transactionParams.push_back(static_cast<int32_t>(info.info_.merchant_id_)); // merchant_id
             
-            client.queryWithCallback(verifySQL, {update.loginName}, [&](const mysqlx::Row& row) {
-                updatedBalanceStr = row[0].get<std::string>();
-                updatedBalance = std::stod(updatedBalanceStr);
-                LOG_INFO("Verify SELECT result: updated amount=%s", updatedBalanceStr.c_str());
-            });
+            int64_t transInsertCount = client.safeExecuteUpdate(transactionSql, transactionParams, 1);
+            if (transInsertCount == -1) {
+                LOG_ERROR("Failed to insert transaction record for player %lu", playerId);
+                return false;
+            }
             
-            // 更新结果中保存实际的数据库值，用于同步内存
-            result.success = true;
-            result.actualBalance = updatedBalance;
-            
-            LOG_INFO("Successfully updated balance for player %s: %.2f -> %s", 
-                     update.loginName.c_str(), currentBalance, updatedBalanceStr.c_str());
-            
+            LOG_INFO("Balance update completed successfully for player %lu, new balance: %.2f", 
+                    playerId, newBalance);
             return true;
+            
         } catch (const std::exception& e) {
-            result.success = false;
-            result.errorMessage = "Database error: " + std::string(e.what());
-            LOG_ERROR("Database error during balance update for %s: %s", 
-                     update.loginName.c_str(), e.what());
+            LOG_ERROR("Database error during player balance update: %s", e.what());
             return false;
         }
     });
     
     return success;
-} 
+}

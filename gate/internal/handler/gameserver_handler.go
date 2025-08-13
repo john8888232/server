@@ -6,6 +6,7 @@ import (
 	"gate/internal/model"
 	"gate/internal/util"
 	"gate/proto"
+	"strings"
 
 	"github.com/gorilla/websocket"
 	protobuf "google.golang.org/protobuf/proto"
@@ -47,7 +48,12 @@ func (gsh *GameServerHandler) HandleGameServerMessage(gs *model.GameServer) {
 	for {
 		n, err := gs.Conn.Read(tmpBuf)
 		if err != nil {
-			util.Logger.Errorf("Failed to read from GameServer %s:%d: %v", gs.IP, gs.Port, err)
+			// 检查是否为正常的连接关闭
+			if err.Error() == "EOF" || strings.Contains(err.Error(), "connection reset") || strings.Contains(err.Error(), "broken pipe") {
+				util.Logger.Infof("GameServer %s:%d disconnected: %v", gs.IP, gs.Port, err)
+			} else {
+				util.Logger.Errorf("Failed to read from GameServer %s:%d: %v", gs.IP, gs.Port, err)
+			}
 			return
 		}
 		buffer.Write(tmpBuf[:n])
@@ -60,7 +66,7 @@ func (gsh *GameServerHandler) HandleGameServerMessage(gs *model.GameServer) {
 
 			util.Logger.Infof("Received message from GameServer %s - ID: 0x%X, session: %s, data length: %d",
 				gs.ID, msgID, sessionID, len(data))
-			util.Logger.Infof("Data content: %x", data)
+			//util.Logger.Infof("Data content: %x", data)
 
 			if msgID == 0x11002 { // LoginResp
 				util.Logger.Infof("Processing GameServer login response...")

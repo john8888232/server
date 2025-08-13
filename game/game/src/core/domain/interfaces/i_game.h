@@ -7,9 +7,9 @@
 #include <chrono>
 #include <shared_mutex>
 #include <atomic>
-#include <third_party/nlohmann/json.hpp>
+#include "third_party/nlohmann/json.hpp"
 #include "core/domain/models/player_in_game.h"
-#include "core/infrastructure/proto/game.pb.h"
+#include "core/infrastructure/protogen/game.pb.h"
 
 using json = nlohmann::json;
 
@@ -99,21 +99,18 @@ public:
     virtual std::shared_ptr<PlayerInGame> getPlayer(const std::string& loginname) const;
     
     std::string generateRoundId();    // 生成局号
-    std::string generateOrderId();    // 生成订单ID
-    std::string generateTransId();    // 生成交易ID
     
 protected:
     std::unordered_map<std::string, std::shared_ptr<PlayerInGame>> players_; // key - loginname
 	std::string roundID_;
     std::string gameType_;
-	std::atomic<GameStatus> status_{GameStatus::INIT};  // 原子状态，默认初始化为INIT
+	std::atomic<GameStatus> status_{GameStatus::INIT}; 
 	std::chrono::system_clock::time_point startTime_;
     
-    // 细粒度锁设计 - 按功能模块分离
-    // 1. 游戏核心状态锁（细粒度）
+    // 游戏核心状态锁（细粒度）
     mutable std::shared_mutex gameStateMutex_;  // 保护roundID_, gameType_, startTime_
     
-    // 2. 玩家管理锁
+    // 玩家管理锁
     mutable std::shared_mutex playersMutex_;    // 保护players_
     
     // 锁的获取顺序规则（防止死锁）：
@@ -127,10 +124,6 @@ protected:
     // - 写操作使用独占锁（unique_lock）
     // - 尽量缩小锁的作用域
     // - 避免在锁内调用可能获取其他锁的函数
-
-private:
-    // 辅助方法
-    static int getGameTypeId(const std::string& gameType);
 };
 
 #endif // I_GAME_H

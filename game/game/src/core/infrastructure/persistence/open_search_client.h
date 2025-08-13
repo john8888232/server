@@ -7,7 +7,7 @@
 #include <libuv_cpp/include/uv11.hpp>
 #include <cpr/cpr.h>
 #include <json/json.h>
-#include "../common/config_manager.h"
+#include "core/infrastructure/common/config_manager.h"
 
 namespace Aws {
     class SDKOptions;

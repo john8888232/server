@@ -20,7 +20,7 @@ func main() {
 	if err := config.LoadConfig("config.yaml"); err != nil {
 		log.Fatalf("load config file failed: %v", err)
 	}
-	util.InitLogger(&config.AppConfig)
+	util.InitLogger(&util.ConfigWrapper{Config: &config.AppConfig})
 	// 初始化组件
 	clientMgr := model.NewClientManager()
 	gameServerMgr := model.NewGameServerManager()
@@ -41,6 +41,7 @@ func main() {
 		config.AppConfig.Consul.QueryInterval,
 		gameServerMgr,
 		gameServerHandler,
+		clientMgr,
 	)
 	if err != nil {
 		util.Logger.Fatalf("consul init failed: %v", err)

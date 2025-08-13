@@ -1,18 +1,16 @@
 #include "mines_game.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
-#include <third_party/nlohmann/json.hpp>
-#include <cstdint>
-#include <sstream>
-#include <ctime>
-#include <algorithm>
+#include "core/domain/interfaces/i_game.h"
+#include "games/mines_pro/application/dto/mines_game_result.h"
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/network/protocol.h"
 #include "core/infrastructure/common/utils.h"
-#include "core/infrastructure/persistence/database_factory.h"
 #include "games/game_def.h"
 #include "core/infrastructure/common/error_code.h"
-#include <mutex>
 #include "core/infrastructure/common/dependency_container.h"
+#include "core/infrastructure/repositories/user_balance_repository_impl.h"
+#include "games/mines_pro/infrastructure/repositories/mines_game_repository_impl.h"
+#include "core/infrastructure/common/memory_monitor.h"
 
 extern DependencyContainer& getDependencyContainer();
 
@@ -21,21 +19,15 @@ using json = nlohmann::json;
 MinesGame::MinesGame() 
     : minesCount_(3), totalTiles_(24), eventLoop_(nullptr), 
       tickCounter_(0), stateTransitionTarget_(-1), targetStatus_(GameStatus::INIT),
-      minBet_(10.00), maxBet_(8000.00), maxWinPerRound_(800000.00) {
+      minBet_(10.00), maxBet_(8000.00), maxWinPerRound_(800000.00), hasPendingConfig_(false) {
     
-    // 从依赖容器获取依赖
     auto& container = getDependencyContainer();
     appContext_ = container.resolve<AppContext>();
-    dbFactory_ = container.resolve<DatabaseFactory>();
     
     if (!appContext_) {
-        LOG_ERROR("Failed to resolve AppContext from dependency container");
+        LOG_ERROR("AppContext is null in MinesGame constructor");
     }
-    
-    if (!dbFactory_) {
-        LOG_ERROR("Failed to resolve DatabaseFactory from dependency container");
-    }
-    
+
     grid_ = std::make_shared<MinesGrid>();
     setStatus(GameStatus::INIT);  // 使用封装的方法
     gameType_ = "mines_pro";  // 设置游戏类型
@@ -44,8 +36,9 @@ MinesGame::MinesGame()
         eventLoop_ = appContext_->getEventLoop();
     }
     
-    // 初始化用户余额服务，使用无参构造函数
-    userBalanceService_ = std::make_shared<UserBalanceService>();
+    // 初始化用户余额仓库
+    userBalanceRepository_ = std::make_shared<UserBalanceRepositoryImpl>();
+    gameRepository_ = std::make_shared<MinesGameRepositoryImpl>();
 }
 
 MinesGame::~MinesGame() {
@@ -95,6 +88,7 @@ void MinesGame::onAutoRevealTick() {
     
     if (hasMine) {
         gridLock.unlock();
+        broadcastSnapshot(); 
         enterSettledState();
     } else {
         gridLock.unlock();
@@ -119,6 +113,7 @@ void MinesGame::broadcastStartJettonNotify() {
     notify.set_roundid(roundID_);
     notify.set_gametype(gameType_);
     notify.set_duration(bettingTime_);
+    notify.set_hash(generateResultHash().second);  // 添加hash值
     
     // 序列化消息
     std::string messageData;
@@ -127,21 +122,26 @@ void MinesGame::broadcastStartJettonNotify() {
         return;
     }
     
-    // 广播给游戏中的活跃玩家
-    int broadcastCount = 0;
-    
-    std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-    for (const auto& [loginname, playerInGame] : players_) {
-        if (playerInGame && playerInGame->isActive()) {
-            auto session = playerInGame->getSession().lock();
-            if (session) {
-                bool success = tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_MINES_START_JETTON_NOTIFY, messageData);
-                if (success) {
-                    broadcastCount++;
-                } else {
-                    LOG_WARN("Failed to send start jetton notification to player %s", loginname.c_str());
+    std::vector<std::string> sessionIds;
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        for (const auto& [loginname, playerInGame] : players_) {
+            if (playerInGame && playerInGame->isActive()) {
+                auto session = playerInGame->getSession().lock();
+                if (session) {
+                    sessionIds.push_back(session->getSessionId());
                 }
             }
+        }
+    }
+    
+    int broadcastCount = 0;
+    for (const auto& sessionId : sessionIds) {
+        bool success = tcpServer->sendToPlayer(sessionId, Protocol::SC_MINES_START_JETTON_NOTIFY, messageData);
+        if (success) {
+            broadcastCount++;
+        } else {
+            LOG_WARN("Failed to send start jetton notification to session %s", sessionId.c_str());
         }
     }
     
@@ -172,21 +172,26 @@ void MinesGame::broadcastStopJettonNotify() {
         return;
     }
     
-    // 广播给游戏中的活跃玩家
-    int broadcastCount = 0;
-    
-    std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-    for (const auto& [loginname, playerInGame] : players_) {
-        if (playerInGame && playerInGame->isActive()) {
-            auto session = playerInGame->getSession().lock();
-            if (session) {
-                bool success = tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_GAME_STOP_JETTON_NOTIFY, messageData);
-                if (success) {
-                    broadcastCount++;
-                } else {
-                    LOG_WARN("Failed to send stop jetton notification to player %s", loginname.c_str());
+    std::vector<std::string> sessionIds;
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        for (const auto& [loginname, playerInGame] : players_) {
+            if (playerInGame && playerInGame->isActive()) {
+                auto session = playerInGame->getSession().lock();
+                if (session) {
+                    sessionIds.push_back(session->getSessionId());
                 }
             }
+        }
+    }
+    
+    int broadcastCount = 0;
+    for (const auto& sessionId : sessionIds) {
+        bool success = tcpServer->sendToPlayer(sessionId, Protocol::SC_GAME_STOP_JETTON_NOTIFY, messageData);
+        if (success) {
+            broadcastCount++;
+        } else {
+            LOG_WARN("Failed to send stop jetton notification to session %s", sessionId.c_str());
         }
     }
     
@@ -215,35 +220,39 @@ double MinesGame::getCurrentMultiplier() const {
 }
 
 double MinesGame::getMultiplierForStarCount(int starCount) const {
-    if (starCount <= 0 || starCount > static_cast<int>(tileConfigs_.size())) {
-        return 1.0;
+    if (starCount <= 0 || starCount > tileConfigs_.size()) {
+        return 0.0;
     }
     return tileConfigs_[starCount - 1].first;  // 第1个星星对应数组索引0
 }
 
-std::string MinesGame::generateResultHash() const {
+std::pair<std::string, std::string> MinesGame::generateResultHash() const {
     std::shared_lock<std::shared_mutex> lock(gridMutex_);
     auto mineIndices = grid_->getMineIndices();
     
     std::string resultString;
-    for (uint32_t i = 1; i <= static_cast<uint32_t>(totalTiles_); ++i) {
+    for (uint32_t i = 1; i <= totalTiles_; ++i) {
         bool isMine = std::find(mineIndices.begin(), mineIndices.end(), i) != mineIndices.end();
         resultString += isMine ? '1' : '0';
     }
     
     std::string combined = seed_ + resultString;
-    std::hash<std::string> hasher;
-    size_t hashValue = hasher(combined);
-    
-    std::stringstream ss;
-    ss << std::hex << hashValue;
-    return ss.str();
+    std::string hash = utils::sha256(combined);
+    return {resultString, hash};
 }
 
 void MinesGame::generateGameGrid() {
-    auto now = std::chrono::system_clock::now();
-    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-    seed_ = std::to_string(timestamp);
+    // 生成30位大小写字母+数字组合的seed
+    const std::string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> dis(0, chars.size() - 1);
+    
+    seed_.clear();
+    seed_.reserve(30);
+    for (int i = 0; i < 30; ++i) {
+        seed_ += chars[dis(gen)];
+    }
     
     std::unique_lock<std::shared_mutex> lock(gridMutex_);
     grid_->generateGrid(seed_);
@@ -296,9 +305,17 @@ bool MinesGame::start() {
     generateGameGrid();
     startTime_ = std::chrono::system_clock::now();
     initializeRankInfo();
+
+    // 插入开局记录
+    bool startGameResult = gameRepository_->startGame(roundID_);
+    if (!startGameResult) {
+        LOG_ERROR("Failed to start game due to database issues: %s. Game will continue without database record.", roundID_.c_str());
+        // 继续游戏流程，不让数据库问题阻塞游戏运行
+        // return false;  // 注释掉返回false，让游戏继续
+    }
     
     broadcastStatusNotify(GameStatus::START_JETTON);
-    broadcastStartJettonNotify(); // 添加专用的开始下注通知
+    broadcastStartJettonNotify(); 
     
     tickCounter_ = 0;
     createUnifiedTimer();
@@ -317,7 +334,7 @@ void MinesGame::onStartJettonComplete() {
     GameStatus expected = GameStatus::START_JETTON;
     if (compareAndSwapStatus(expected, GameStatus::STOP_JETTON)) {
         broadcastStatusNotify(GameStatus::STOP_JETTON);
-        broadcastStopJettonNotify(); // 添加专用的停止下注通知
+        broadcastStopJettonNotify();
     } else {
         LOG_WARN("Failed to transition from START_JETTON to STOP_JETTON, current status: %d", 
                  (int)getStatus());
@@ -331,9 +348,24 @@ void MinesGame::onSettledComplete() {
 void MinesGame::enterSettledState() {
     GameStatus expected = GameStatus::STOP_JETTON;
     if (compareAndSwapStatus(expected, GameStatus::SETTLED)) {
-        writeGameResultToDatabase();
-        cleanupInactivePlayers();
-        setStateTransition(WAIT_DURATION, GameStatus::START_JETTON);
+        try {
+            // 启用数据库写入进行性能测试
+            LOG_INFO("Starting database performance test for round %s", roundID_.c_str());
+            writeGameResultToDatabase();
+            LOG_INFO("Database performance test completed for round %s", roundID_.c_str());
+            
+            // 批量写入内存兑现记录到数据库
+            writeCashOutRecordsToDatabase();
+            
+            // 雷爆炸导致的游戏结束，结算所有失败订单
+            settleFailedOrders();
+            
+            cleanupInactivePlayers();
+            setStateTransition(WAIT_DURATION, GameStatus::START_JETTON);
+        } catch (const std::exception& e) {
+            LOG_ERROR("Failed to write game result to database, cannot proceed with payouts: %s", e.what());
+            setStateTransition(WAIT_DURATION, GameStatus::START_JETTON);
+        }
     } else {
         LOG_WARN("Failed to transition to SETTLED state, current status: %d", 
                  (int)getStatus());
@@ -341,18 +373,34 @@ void MinesGame::enterSettledState() {
 }
 
 void MinesGame::startNewRound() {
+    // 在开始新一局前应用待生效的配置
+    if (hasPendingConfig_) {
+        LOG_INFO("Applying pending config at start of round %s", roundID_.c_str());
+        applyConfigInternal(pendingConfig_);
+        hasPendingConfig_ = false;
+        pendingConfig_ = json{}; // 清空待生效配置
+    }
+    
     roundID_ = generateRoundId();
     generateGameGrid();
     initializeRankInfo();
+    
     {
-        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        std::unique_lock<std::shared_mutex> playersLock(playersMutex_); 
         resetAllPlayersCashOutStatus();
     }
     
     startTime_ = std::chrono::system_clock::now();
     setStatus(GameStatus::START_JETTON);
+
+    // 插入开局记录
+    bool startGameResult = gameRepository_->startGame(roundID_);
+    if (!startGameResult) {
+        LOG_ERROR("Failed to start game due to database issues: %s. Game will continue without database record.", roundID_.c_str());
+    }
+
     broadcastStatusNotify(GameStatus::START_JETTON);
-    broadcastStartJettonNotify(); // 添加专用的开始下注通知
+    broadcastStartJettonNotify();
     
     tickCounter_ = 0;
     createUnifiedTimer();
@@ -413,86 +461,85 @@ void MinesGame::broadcastStatusNotify(GameStatus status) {
 }
 
 void MinesGame::writeGameResultToDatabase() {
+    utils::PerformanceTimer totalTimer("Total database write operation", utils::PerformanceTimer::TimeUnit::MILLISECONDS);
     try {
+        // 先获取游戏结果数据
         auto gameResults = getGameResults();
-        auto resultHash = generateResultHash();
+        auto [resultString, resultHash] = generateResultHash();
         
-        // 收集余额更新数据
-        auto balanceUpdates = collectBalanceUpdates();
+        // 创建MinesGameResult对象并填充数据
+        auto minesGameResult = std::make_shared<MinesGameResult>();
+        minesGameResult->roundID = roundID_;
+        minesGameResult->gameType = gameType_;
+        minesGameResult->startTime = startTime_;
+        minesGameResult->endTime = std::chrono::system_clock::now();
+        minesGameResult->mineIndex = resultString;
         
-        // 批量更新余额
-        if (!balanceUpdates.empty()) {
-            // 使用用户余额服务执行批量更新
-            auto results = userBalanceService_->updateBalancesBatch(balanceUpdates);
-            
-            // 处理更新结果
-            processBalanceUpdateResults(results);
-        } else {
-            LOG_INFO("No players to update balance for round %s", roundID_.c_str());
+        // 设置当前倍率
+        minesGameResult->multiplier = getCurrentMultiplier();
+        
+        // 设置hash和seed
+        minesGameResult->hash = resultHash;
+        minesGameResult->seed = seed_;
+        
+        LOG_INFO("Saving game result to database for round %s: mines=%s, multiplier=%.2f, hash=%s, seed=%s", 
+                 roundID_.c_str(), resultString.c_str(), minesGameResult->multiplier, 
+                 resultHash.c_str(), seed_.c_str());
+        
+        // 保存游戏结果到数据库
+        if (!gameRepository_) {
+            LOG_ERROR("Game repository is null for round %s", roundID_.c_str());
+            throw std::runtime_error("Game repository is null");
         }
+        
+        LOG_DEBUG("About to call gameRepository_->saveGame() for round %s", roundID_.c_str());
+        LOG_DEBUG("Memory status before saveGame: allocated=%zu, peak=%zu", 
+                  MemoryMonitor::getInstance().getCurrentAllocated(),
+                  MemoryMonitor::getInstance().getPeakAllocated());
+        
+        bool saveSuccess = false;
+        try {
+            utils::PerformanceTimer saveTimer("Game result save to database", utils::PerformanceTimer::TimeUnit::MILLISECONDS);
+            LOG_DEBUG("Calling gameRepository_->saveGame() now for round %s", roundID_.c_str());
+            saveSuccess = gameRepository_->saveGame(minesGameResult);
+            LOG_DEBUG("gameRepository_->saveGame() returned %s for round %s", 
+                      saveSuccess ? "true" : "false", roundID_.c_str());
+            auto elapsed = saveTimer.elapsed();
+            LOG_INFO("Database saveGame took: %lld ms for round %s", elapsed, roundID_.c_str());
+            
+            if (elapsed > 1000) {
+                LOG_WARN("Database save operation took longer than expected: %lld ms for round %s", 
+                         elapsed, roundID_.c_str());
+            }
+        } catch (const std::exception& e) {
+            LOG_ERROR("Exception during database save for round %s: %s", roundID_.c_str(), e.what());
+            throw;
+        } catch (...) {
+            LOG_ERROR("Unknown exception during database save for round %s", roundID_.c_str());
+            throw;
+        }
+        
+        if (!saveSuccess) {
+            LOG_ERROR("Failed to save game result to database for round %s", roundID_.c_str());
+            throw std::runtime_error("Failed to save game result to database");
+        }
+        
+        LOG_INFO("Game result saved successfully to database for round %s", roundID_.c_str());
+
+        // 总耗时输出
+        LOG_INFO("Total database operation took: %lld ms", totalTimer.elapsed());
         
     } catch (const std::exception& e) {
         LOG_ERROR("Failed to write game result to database for round %s: %s", 
                  roundID_.c_str(), e.what());
+        LOG_INFO("Failed database operation took: %lld ms", totalTimer.elapsed());
+        throw; 
     }
 }
 
 void MinesGame::initializeWithConfig(const json& config) {
-    gameConfig_ = config;
-    
-    // 解析基本游戏规则
-        if (config.contains("rules")) {
-            const auto& rules = config["rules"];
-        
-        if (rules.contains("betting_time")) {
-            bettingTime_ = rules["betting_time"].get<uint32_t>();
-        }
-            
-            if (rules.contains("mines_count")) {
-            minesCount_ = rules["mines_count"].get<uint32_t>();
-            }
-            
-            if (rules.contains("grid_size")) {
-            totalTiles_ = rules["grid_size"].get<uint32_t>();
-            }
-    }
-    
-    // 解析下注限制和最大赔付配置
-    if (config.contains("betting")) {
-        const auto& betting = config["betting"];
-        
-        if (betting.contains("min_bet")) {
-            minBet_ = betting["min_bet"].get<double>();
-        }
-        
-        if (betting.contains("max_bet")) {
-            maxBet_ = betting["max_bet"].get<double>();
-        }
-        
-        if (betting.contains("max_win_per_round")) {
-            maxWinPerRound_ = betting["max_win_per_round"].get<double>();
-            }
-        }
-        
-    // 解析倍数配置
-    tileConfigs_.clear();
-        if (config.contains("multipliers")) {
-            const auto& multipliers = config["multipliers"];
-        
-        for (uint32_t i = 1; i <= totalTiles_; ++i) {
-                std::string key = std::to_string(i);
-                if (multipliers.contains(key) && multipliers[key].is_array() && multipliers[key].size() >= 2) {
-                double multi = multipliers[key][0].get<double>();
-                    double weight = multipliers[key][1].get<double>();
-                tileConfigs_.push_back(std::make_pair(multi, weight));
-                } else {
-                tileConfigs_.push_back(std::make_pair(0.0, 0.0));
-            }
-        }
-    }
-    
-    // 初始化游戏网格
-    initializeMinesGrid();
+    // 使用统一的配置应用方法
+    applyConfigInternal(config);
     
     LOG_INFO("Initialized mines game with config: minesCount=%d, totalTiles=%d, bettingTime=%d, minBet=%.2f, maxBet=%.2f, maxWinPerRound=%.2f",
              minesCount_, totalTiles_, bettingTime_, minBet_, maxBet_, maxWinPerRound_);
@@ -542,120 +589,141 @@ std::shared_ptr<proto::GameSnapshotNotify> MinesGame::createSnapshot() {
         }
     }
     
+    // 设置hash值 - 状态1、2、3时有效
+    if (currentStatus == GameStatus::START_JETTON || currentStatus == GameStatus::STOP_JETTON || currentStatus == GameStatus::SETTLED) {
+        snapshot->set_hash(generateResultHash().second);
+    }
+    
+    // 设置seed值 - 仅在状态3(SETTLED)时有效
+    if (currentStatus == GameStatus::SETTLED) {
+        snapshot->set_seed(seed_);
+    }
+    
     LOG_DEBUG("Created snapshot for game %s: status=%d, remainTime=%ld, results=%d", 
-             roundID_.c_str(), static_cast<int>(currentStatus), remainTime, 
+             roundID_.c_str(), currentStatus, remainTime, 
              snapshot->result_size());
     
     return snapshot;
 }
 
 void MinesGame::onConfigUpdated(const json& newConfig) {
-    LOG_INFO("MinesGame received config update for roundId: %s", roundID_.c_str());
+    LOG_INFO("MinesGame received config update for roundId: %s, storing for next round", roundID_.c_str());
     
-    // 保存旧配置
+    // 将新配置存储为待生效配置，不立即应用
+    pendingConfig_ = newConfig;
+    hasPendingConfig_ = true;
+    
+    LOG_INFO("Config update cached, will take effect at start of next round");
+}
+
+// 内部方法：实际应用配置（从initializeWithConfig和延迟配置应用处调用）
+void MinesGame::applyConfigInternal(const json& config) {
     json oldConfig = gameConfig_;
-    gameConfig_ = newConfig;
+    auto oldtileConfigs = tileConfigs_;
+
+    gameConfig_ = config;
     
-    // 解析新配置
-    int newMineCount = minesCount_;
-    int newTotalTiles = totalTiles_;
-    int newBettingTime = bettingTime_;
-    
-    try {
-        if (newConfig.contains("rules")) {
-            const auto& rules = newConfig["rules"];
-            
-            if (rules.contains("mines_count")) {
-                newMineCount = rules["mines_count"].get<int>();
-            }
-            
-            if (rules.contains("grid_size")) {
-                newTotalTiles = rules["grid_size"].get<int>();
-            }
-            
-            if (rules.contains("betting_time")) {
-                newBettingTime = rules["betting_time"].get<int>();
-            }
-        }
+    // 解析基本游戏规则
+    if (config.contains("rules")) {
+        const auto& rules = config["rules"];
         
-        // 更新倍数和权重表
-        if (newConfig.contains("multipliers")) {
-            const auto& multipliers = newConfig["multipliers"];
-            std::vector<std::pair<double, double>> newTileConfigs;
-            for (int i = 1; i <= newTotalTiles; ++i) {
-                std::string key = std::to_string(i);
-                if (multipliers.contains(key) && multipliers[key].is_array() && multipliers[key].size() >= 2) {
-                    double multiplier = multipliers[key][0].get<double>();
-                    double weight = multipliers[key][1].get<double>();
-                    newTileConfigs.push_back({multiplier, weight});
-                }
-            }
-            if (newTileConfigs.size() == newTotalTiles) {
-                tileConfigs_ = newTileConfigs;
-                LOG_INFO("Updated tile configurations (multipliers and weights)");
-            }
+        if (rules.contains("betting_time")) {
+            bettingTime_ = rules["betting_time"].get<uint32_t>();
         }
-        
-    } catch (const std::exception& e) {
-        LOG_ERROR("Error parsing new game config: %s", e.what());
-        return;
+            
+        if (rules.contains("mines_count")) {
+            minesCount_ = rules["mines_count"].get<uint32_t>();
+        }
+            
+        if (rules.contains("grid_size")) {
+            totalTiles_ = rules["grid_size"].get<uint32_t>();
+        }
     }
     
-    // 检查关键配置是否发生变化
-    bool gridConfigChanged = (newMineCount != minesCount_) || (newTotalTiles != totalTiles_);
-    
-    // 更新配置参数
-    minesCount_ = newMineCount;
-    totalTiles_ = newTotalTiles;
-    bettingTime_ = newBettingTime;
-    
-    // 如果网格配置发生变化，重新初始化网格
-    if (gridConfigChanged) {
-        initializeMinesGrid();
-        LOG_INFO("Grid configuration updated: %d tiles, %d mines", totalTiles_, minesCount_);
+    // 解析下注限制和最大赔付配置
+    if (config.contains("betting")) {
+        const auto& betting = config["betting"];
+        
+        if (betting.contains("min_bet")) {
+            minBet_ = betting["min_bet"].get<double>();
+        }
+        
+        if (betting.contains("max_bet")) {
+            maxBet_ = betting["max_bet"].get<double>();
+        }
+        
+        if (betting.contains("max_win_per_round")) {
+            maxWinPerRound_ = betting["max_win_per_round"].get<double>();
+        }
+    }
+        
+    // 解析倍数配置
+    tileConfigs_.clear();
+    if (config.contains("multipliers")) {
+        const auto& multipliers = config["multipliers"];
+        
+        for (uint32_t i = 1; i <= totalTiles_; ++i) {
+            std::string key = std::to_string(i);
+            if (multipliers.contains(key) && multipliers[key].is_array() && multipliers[key].size() >= 2) {
+                double multi = multipliers[key][0].get<double>();
+                double weight = multipliers[key][1].get<double>();
+                tileConfigs_.push_back(std::make_pair(multi, weight));
+            } else {
+                tileConfigs_.push_back(std::make_pair(0.0, 0.0));
+            }
+        }
     }
     
-    LOG_INFO("MinesGame config update completed");
+    // 初始化游戏网格
+    initializeMinesGrid();
+    
+    LOG_INFO("Applied mines game config: minesCount=%d, totalTiles=%d, bettingTime=%d, minBet=%.2f, maxBet=%.2f, maxWinPerRound=%.2f",
+             minesCount_, totalTiles_, bettingTime_, minBet_, maxBet_, maxWinPerRound_);
 }
 
 
 void MinesGame::initializeRankInfo() {
-    roundPlayerRecord_.Clear();
-    roundPlayerRecord_.set_roundid(roundID_);
-    roundPlayerRecord_.set_gametype(gameType_);
+    roundPlayerBetRecord_.reset();
+    roundPlayerBetRecord_.roundID_ = roundID_;
+    roundPlayerBetRecord_.gameType_ = gameType_;
     roundPlayerRecordIndex_.clear();
     LOG_DEBUG("Initialized rank info for game %s", roundID_.c_str());
 }
 
-void MinesGame::updatePlayerBet(const std::string& loginname, const proto::PlayerInfo& playerInfo, 
-                               const proto::BetRecord& betRecord) {
-    // 注意：此方法应在rankMutex_锁保护下调用
-    
-    // 创建(玩家,玩法)的唯一键
-    std::string playerPlayTypeKey = loginname + "_" + std::to_string(betRecord.playtype());
+void MinesGame::updatePlayerBet(const PlayerBriefInfo& playerInfo, RecordDetail&& betdetail) {
+    // (玩家,玩法)
+    std::string playerPlayTypeKey = playerInfo.loginname_ + "_" + std::to_string(betdetail.playType_);
     auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
-    proto::PlayerInfoSnap* playerSnap = nullptr;
     
     if (indexIt == roundPlayerRecordIndex_.end()) {
-        // 新的(玩家,玩法)组合，添加到榜单
-        playerSnap = roundPlayerRecord_.add_players();
-        *playerSnap->mutable_info() = playerInfo;
+        // 添加
+        PlayerRoundInfo newPlayerInfo;
         
-        // 添加单个玩法的下注记录
-        auto bet = playerSnap->mutable_bets()->Add();
-        bet->set_playtype(betRecord.playtype());
-        bet->set_amount(betRecord.amount());
+        newPlayerInfo.info_.nickname_ = playerInfo.nickname_;
+        newPlayerInfo.info_.avatar_ = playerInfo.avatar_;
+        newPlayerInfo.info_.loginname_ = playerInfo.loginname_;
+        newPlayerInfo.info_.player_id_ = playerInfo.player_id_;
+        newPlayerInfo.info_.original_balance_ = playerInfo.original_balance_;
+        newPlayerInfo.info_.client_ip_ = playerInfo.client_ip_;
         
-        roundPlayerRecordIndex_[playerPlayTypeKey] = roundPlayerRecord_.players_size() - 1;
+        BetRecord bet;
+        bet.playType_ = betdetail.playType_;
+        bet.amount_ = betdetail.amount_;
+        bet.bet_time_ = std::chrono::system_clock::now();
+        
+        bet.details_.push_back(std::move(betdetail));
+        newPlayerInfo.bets_.push_back(std::move(bet));
+        
+        roundPlayerBetRecord_.players_.push_back(std::move(newPlayerInfo));
+        roundPlayerRecordIndex_[playerPlayTypeKey] = roundPlayerBetRecord_.players_.size() - 1;
     } else {
-        // 现有(玩家,玩法)组合，更新信息
-        playerSnap = roundPlayerRecord_.mutable_players(indexIt->second);
-        *playerSnap->mutable_info() = playerInfo;  // 更新玩家基本信息（如余额）
-    
-        // 累计相同玩法的下注金额
-    auto& bets = *playerSnap->mutable_bets();
-        if (bets.size() > 0 && bets[0].playtype() == betRecord.playtype()) {
-            bets[0].set_amount(bets[0].amount() + betRecord.amount());
+        // 更新
+        auto& playerBetInfo = roundPlayerBetRecord_.players_[indexIt->second];
+        if (!playerBetInfo.bets_.empty()) {
+            auto& bet = playerBetInfo.bets_[0];
+            bet.details_.push_back(std::move(betdetail));
+            bet.amount_ += betdetail.amount_;
+            bet.bet_time_ = betdetail.time_;
         }
     }
     
@@ -663,45 +731,32 @@ void MinesGame::updatePlayerBet(const std::string& loginname, const proto::Playe
     sortRankByBetAmount();
     
     LOG_DEBUG("Updated player bet for loginname %s, playType=%d, amount=%.2f", 
-              loginname.c_str(), betRecord.playtype(), betRecord.amount());
+              playerInfo.loginname_.c_str(), betdetail.playType_, betdetail.amount_);
 }
 
-void MinesGame::updatePlayerCash(const std::string& loginname, const proto::ReckonRecord& reckonRecord) {
-    // 注意：此方法应在rankMutex_锁保护下调用
-    
-    // 创建(玩家,玩法)的唯一键
-    std::string playerPlayTypeKey = loginname + "_" + std::to_string(reckonRecord.playtype());
+void MinesGame::updatePlayerCash(const std::string& loginname, ReckonRecord&& reckonRecord) {
+    // (玩家,玩法)的唯一键
+    std::string playerPlayTypeKey = loginname + "_" + std::to_string(reckonRecord.playType_);
     auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
     if (indexIt == roundPlayerRecordIndex_.end()) {
         LOG_WARN("Player loginname %s playType %d not found in rank data for cash update", 
-                 loginname.c_str(), reckonRecord.playtype());
+                 loginname.c_str(), reckonRecord.playType_);
         return;
     }
-    
-    auto playerSnap = roundPlayerRecord_.mutable_players(indexIt->second);
-    
-    // 添加兑奖记录
-    auto& reckons = *playerSnap->mutable_reckons();
-    auto newReckon = reckons.Add();
-    *newReckon = reckonRecord;
-    
-    LOG_DEBUG("Updated player cash for loginname %s, playType=%d, amount=%.2f, multi=%.2f", 
-              loginname.c_str(), reckonRecord.playtype(), reckonRecord.amount(), reckonRecord.multi());
+    auto& playerBetInfo = roundPlayerBetRecord_.players_[indexIt->second];
+    playerBetInfo.reckons_.push_back(std::move(reckonRecord));
 }
 
 void MinesGame::sortRankByBetAmount() {
-    // 注意：此方法应在rankMutex_锁保护下调用
-    
     // 创建索引和下注金额的映射
     std::vector<std::pair<double, int>> betAmountIndex;
     
-    for (int i = 0; i < roundPlayerRecord_.players_size(); ++i) {
-        const auto& player = roundPlayerRecord_.players(i);
+    for (size_t i = 0; i < roundPlayerBetRecord_.players_.size(); ++i) {
+        const auto& player = roundPlayerBetRecord_.players_[i];
         double betAmount = 0.0;
         
-        // 每个玩家只有一个玩法的下注记录
-        if (player.bets_size() > 0) {
-            betAmount = player.bets(0).amount();
+        for (const auto& bet : player.bets_) {
+            betAmount += bet.amount_;
         }
         
         betAmountIndex.push_back({betAmount, i});
@@ -714,9 +769,10 @@ void MinesGame::sortRankByBetAmount() {
               });
     
     // 创建新的排序后的玩家列表
-    proto::GameRankInfoNotify sortedNotify;
-    sortedNotify.set_roundid(roundPlayerRecord_.roundid());
-    sortedNotify.set_gametype(roundPlayerRecord_.gametype());
+    MinesBetRecord sortedRecord;
+    sortedRecord.reset();
+    sortedRecord.roundID_ = roundPlayerBetRecord_.roundID_;
+    sortedRecord.gameType_ = roundPlayerBetRecord_.gameType_;
     
     // 创建反向映射：oldIndex -> playerPlayTypeKey
     std::unordered_map<int, std::string> oldIndexToPlayerPlayTypeKey;
@@ -729,8 +785,7 @@ void MinesGame::sortRankByBetAmount() {
     
     for (size_t newIndex = 0; newIndex < betAmountIndex.size(); ++newIndex) {
         int oldIndex = betAmountIndex[newIndex].second;
-        auto playerSnap = sortedNotify.add_players();
-        *playerSnap = roundPlayerRecord_.players(oldIndex);
+        sortedRecord.players_.push_back(roundPlayerBetRecord_.players_[oldIndex]);
         
         // 更新映射
         auto playerPlayTypeIt = oldIndexToPlayerPlayTypeKey.find(oldIndex);
@@ -740,10 +795,10 @@ void MinesGame::sortRankByBetAmount() {
     }
     
     // 替换原有的榜单数据
-    roundPlayerRecord_ = std::move(sortedNotify);
+    roundPlayerBetRecord_ = std::move(sortedRecord);
     
     LOG_DEBUG("Sorted rank by bet amount for game %s, %d entries", 
-              roundID_.c_str(), roundPlayerRecord_.players_size());
+              roundID_.c_str(), roundPlayerBetRecord_.players_.size());
 }
 
 proto::GameRankInfoNotify MinesGame::getRankInfoNotify() const {
@@ -751,29 +806,47 @@ proto::GameRankInfoNotify MinesGame::getRankInfoNotify() const {
     
     // 创建限制为前50个的副本
     proto::GameRankInfoNotify rankInfoCopy;
-    rankInfoCopy.set_roundid(roundPlayerRecord_.roundid());
-    rankInfoCopy.set_gametype(roundPlayerRecord_.gametype());
+    rankInfoCopy.set_roundid(roundPlayerBetRecord_.roundID_);
+    rankInfoCopy.set_gametype(roundPlayerBetRecord_.gameType_);
     
     // 限制玩家数量为前50个
-    int playerCount = roundPlayerRecord_.players_size();
+    int playerCount = roundPlayerBetRecord_.players_.size();
     int maxPlayers = std::min(playerCount, MAX_RANK_DISPLAY_COUNT);
     
     for (int i = 0; i < maxPlayers; ++i) {
+        const auto& oldPlayer = roundPlayerBetRecord_.players_[i];
         auto* newPlayer = rankInfoCopy.add_players();
-        *newPlayer = roundPlayerRecord_.players(i);
+
+        // 转换玩家基本信息
+        auto* newInfo = newPlayer->mutable_info();
+        newInfo->set_nickname(oldPlayer.info_.nickname_);
+        newInfo->set_avatar(oldPlayer.info_.avatar_);
+        
+        // 转换下注记录
+        for (const auto& bet : oldPlayer.bets_) {
+            auto* newBet = newPlayer->add_bets();
+            newBet->set_playtype(bet.playType_);
+            newBet->set_amount(bet.amount_);
+        }
+
+        // 转换派奖记录
+        for (const auto& reckon : oldPlayer.reckons_) {
+            auto* newReckon = newPlayer->add_reckons();
+            newReckon->set_playtype(reckon.playType_);
+            newReckon->set_amount(reckon.amount_);
+            newReckon->set_multi(reckon.multi_);
+        }
     }
     
-    return rankInfoCopy;  // 返回限制后的副本，线程安全
+    return rankInfoCopy; 
 }
 
 void MinesGame::broadcastRankInfo() {
-    // 使用成员变量 appContext_
     if (!appContext_) {
         LOG_ERROR("AppContext is null");
         return;
     }
     
-    // 获取TCP服务器
     auto tcpServer = appContext_->getTcpServer();
     if (!tcpServer) {
         LOG_ERROR("TcpServer not available");
@@ -781,11 +854,7 @@ void MinesGame::broadcastRankInfo() {
     }
     
     // 获取排行榜数据
-    proto::GameRankInfoNotify rankInfoCopy;
-    {
-        std::shared_lock<std::shared_mutex> lock(rankMutex_);
-        rankInfoCopy = roundPlayerRecord_;
-    }
+    proto::GameRankInfoNotify rankInfoCopy = getRankInfoNotify();
     
     // 序列化消息
     std::string data;
@@ -794,26 +863,32 @@ void MinesGame::broadcastRankInfo() {
         return;
     }
     
-    // 广播给游戏中的活跃玩家
-    int broadcastCount = 0;
-    
-    std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-    for (const auto& [loginname, playerInGame] : players_) {
-        if (playerInGame && playerInGame->isActive()) {
-            auto session = playerInGame->getSession().lock();
-            if (session) {
-                // 发送榜单信息给玩家
-                bool success = tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_GAME_RANK_INFO_NOTIFY, data);
-                if (success) {
-                    broadcastCount++;
-                } else {
-                    LOG_WARN("Failed to send rank info to player %s", loginname.c_str());
+    // 先收集需要广播的会话ID，然后释放锁
+    std::vector<std::string> sessionIds;
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        for (const auto& [loginname, playerInGame] : players_) {
+            if (playerInGame && playerInGame->isActive()) {
+                auto session = playerInGame->getSession().lock();
+                if (session) {
+                    sessionIds.push_back(session->getSessionId());
                 }
             }
         }
+    } 
+    
+    int broadcastCount = 0;
+    for (const auto& sessionId : sessionIds) {
+        bool success = tcpServer->sendToPlayer(sessionId, Protocol::SC_GAME_RANK_INFO_NOTIFY, data);
+        if (success) {
+            broadcastCount++;
+        } else {
+            LOG_WARN("Failed to send rank info to session %s", sessionId.c_str());
+        }
     }
+    
     if(broadcastCount > 0) {
-        LOG_INFO("Broadcasted rank info to %d active players", broadcastCount);
+        LOG_DEBUG("Broadcasted rank info to %d active players", broadcastCount);
     }
 }
 
@@ -845,22 +920,27 @@ void MinesGame::broadcastSnapshot() {
         return;
     }
     
-    // 广播给游戏中的活跃玩家
-    int broadcastCount = 0;
-    
-    std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-    for (const auto& [loginname, playerInGame] : players_) {
-        if (playerInGame && playerInGame->isActive()) {
-            auto session = playerInGame->getSession().lock();
-            if (session) {
-                // 发送快照信息给玩家
-                bool success = tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_GAME_SNAPSHOT_NOTIFY, data);
-                if (success) {
-                    broadcastCount++;
-                } else {
-                    LOG_WARN("Failed to send snapshot to player %s", loginname.c_str());
+    // 先收集需要广播的会话ID，然后释放锁
+    std::vector<std::string> sessionIds;
+    {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        for (const auto& [loginname, playerInGame] : players_) {
+            if (playerInGame && playerInGame->isActive()) {
+                auto session = playerInGame->getSession().lock();
+                if (session) {
+                    sessionIds.push_back(session->getSessionId());
                 }
             }
+        }
+    } 
+    
+    int broadcastCount = 0;
+    for (const auto& sessionId : sessionIds) {
+        bool success = tcpServer->sendToPlayer(sessionId, Protocol::SC_GAME_SNAPSHOT_NOTIFY, data);
+        if (success) {
+            broadcastCount++;
+        } else {
+            LOG_WARN("Failed to send snapshot to session %s", sessionId.c_str());
         }
     }
     
@@ -878,8 +958,8 @@ void MinesGame::createUnifiedTimer() {
     // 创建每秒重复的统一定时器
     unifiedTimer_ = std::make_shared<uv::Timer>(
         eventLoop_,
-        1000,  // 1秒后开始
-        1000,  // 每秒重复
+        1000,
+        1000, 
         [this](uv::Timer* timer) {
             onUnifiedTick();
         }
@@ -896,39 +976,37 @@ void MinesGame::createUnifiedTimer() {
 
 void MinesGame::cleanupUnifiedTimer() {
     if (unifiedTimer_) {
-        auto timerToClose = unifiedTimer_;
-        unifiedTimer_.reset(); 
-        timerToClose->close([timerToClose](uv::Timer*) {
+        unifiedTimer_->close([](uv::Timer*) {
             LOG_DEBUG("Unified timer closed and released");
         });
+        unifiedTimer_.reset(); 
     }
 }
 
 void MinesGame::onUnifiedTick() {
-    utils::PerformanceTimer timer(false);
-    timer.setTimeUnit(utils::PerformanceTimer::TimeUnit::MICROSECONDS);
-    timer.start();
-    
+    LOG_DEBUG("Timer tick started for game %s, counter: %d", roundID_.c_str(), tickCounter_);
     tickCounter_++;
-    
+    LOG_DEBUG("Checking state transition for game %s", roundID_.c_str());
     // 检查状态转换
     checkStateTransition();
     
     // 处理自动翻牌（STOP_JETTON阶段）- 先翻牌
     GameStatus currentStatus = getStatus();
+    LOG_DEBUG("Current status: %d for game %s", (int)currentStatus, roundID_.c_str());
     if (currentStatus == GameStatus::STOP_JETTON) {
+        LOG_DEBUG("Handling auto reveal for game %s", roundID_.c_str());
         handleAutoReveal();
     }
     
+    LOG_DEBUG("Handling broadcasts for game %s", roundID_.c_str());
     // 处理广播 - 后广播（确保广播的是最新状态）
     handleBroadcasts();
-    
-    auto duration = timer.stop();
-    LOG_DEBUG("Timer tick completed in %ld microseconds for game %s", 
-              duration, roundID_.c_str());
 }
 
 void MinesGame::checkStateTransition() {
+    LOG_DEBUG("Checking transition: target=%d, counter=%d for game %s", 
+              stateTransitionTarget_, tickCounter_, roundID_.c_str());
+              
     if (stateTransitionTarget_ > 0 && tickCounter_ >= stateTransitionTarget_) {
         LOG_INFO("State transition triggered for game %s: %d -> %d", 
                  roundID_.c_str(), (int)getStatus(), (int)targetStatus_);
@@ -939,9 +1017,11 @@ void MinesGame::checkStateTransition() {
         // 执行状态转换
         switch (targetStatus_) {
             case GameStatus::STOP_JETTON:
+                LOG_INFO("Transitioning to STOP_JETTON for game %s", roundID_.c_str());
                 onStartJettonComplete();
                 break;
             case GameStatus::START_JETTON:
+                LOG_INFO("Transitioning to START_JETTON for game %s", roundID_.c_str());
                 onSettledComplete();
                 break;
             default:
@@ -957,7 +1037,6 @@ void MinesGame::handleBroadcasts() {
     if (currentStatus == GameStatus::START_JETTON || currentStatus == GameStatus::STOP_JETTON) {
         broadcastRankInfo();
     }
-    
     // 在 START_JETTON 和 STOP_JETTON 阶段广播快照
     if (currentStatus == GameStatus::START_JETTON || currentStatus == GameStatus::STOP_JETTON) {
         broadcastSnapshot();
@@ -1025,15 +1104,7 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
         response.set_message("User object not found");
         return false;
     }
-    
-    // 获取sessionId用于榜单操作
-    std::string sessionId;
-    auto session = playerInGame->getSession().lock();
-    if (session) {
-        sessionId = session->getSessionId();
-    }
-    
-    // 创建(玩家,玩法)的唯一键
+
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
     auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
     if (indexIt == roundPlayerRecordIndex_.end()) {
@@ -1043,17 +1114,17 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= roundPlayerRecord_.players_size()) {
+    if (playerIndex >= roundPlayerBetRecord_.players_.size()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player index out of range");
         return false;
     }
     
-    auto* player = roundPlayerRecord_.mutable_players(playerIndex);
+    auto& player = roundPlayerBetRecord_.players_[playerIndex];
     
     // 检查是否已经兑现过
-    for (const auto& reckon : player->reckons()) {
-        if (reckon.playtype() == playType) {
+    for (const auto& reckon : player.reckons_) {
+        if (reckon.playType_ == playType) {
             response.set_code(ErrorCode::ALREADY_CASHED_OUT);
             response.set_message("Already cashed out for this play type");
             return false;
@@ -1082,39 +1153,45 @@ bool MinesGame::processCashOut(const std::string& loginname, const std::string& 
     }
     
     double playTypeBetAmount = 0.0;
-    if (player->bets_size() > 0) {
-        playTypeBetAmount = player->bets(0).amount();
+    if (!player.bets_.empty()) {
+        playTypeBetAmount = player.bets_[0].amount_;
     }
     
     double payoutAmount = playTypeBetAmount * currentMultiplier;
-    
+    // 检查是否超过最大赔付限制
+    if (payoutAmount > maxWinPerRound_) {
+        LOG_WARN("Payout amount %.2f exceeds maximum win limit %.2f, capping at maximum", 
+                payoutAmount, maxWinPerRound_);
+        payoutAmount = maxWinPerRound_;
+    }
     // 创建兑现记录
-    proto::ReckonRecord reckon;
-    reckon.set_playtype(playType);
-    reckon.set_amount(payoutAmount);
-    reckon.set_multi(currentMultiplier);
-    
-    // 更新玩家余额
-    double newBalance = user->getBalance() + payoutAmount;
-    user->setBalance(newBalance);
-    
-    // 更新榜单中的余额
-    player->mutable_info()->set_balance(newBalance);
+    ReckonRecord reckon;
+    reckon.playType_ = playType;
+    reckon.amount_ = payoutAmount;
+    reckon.multi_ = currentMultiplier;
+    reckon.reckon_time_ = std::chrono::system_clock::now();
+    reckon.before_amount = user->getBalance();
+    // 玩家加钱
+    user->setBalance(user->getBalance() + payoutAmount);
+    reckon.after_amount = user->getBalance();
     
     // 使用updatePlayerCash方法更新兑现记录
-    updatePlayerCash(loginname, reckon);
+    updatePlayerCash(loginname, std::move(reckon));
     
-    // 标记为已兑现
-    playerInGame->setCashedOut(playType, true);
+    // 标记兑现
+    playerInGame->setCashedOut(playType);
     
     // 设置成功响应
     response.set_code(0);
     response.set_message("Cash out successful");
-    *response.mutable_reckon() = reckon;
-    response.set_balance(newBalance);
+    auto* protoReckon = response.mutable_reckon();
+    protoReckon->set_playtype(reckon.playType_);
+    protoReckon->set_amount(reckon.amount_);
+    protoReckon->set_multi(reckon.multi_);
+    response.set_balance(user->getBalance());
     
     LOG_INFO("Cash out successful for player %s: playType=%d, payout=%.2f, multi=%.2f, newBalance=%.2f", 
-             loginname.c_str(), playType, payoutAmount, currentMultiplier, newBalance);
+             loginname.c_str(), playType, payoutAmount, currentMultiplier, user->getBalance());
     
     return true;
 }
@@ -1188,18 +1265,18 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= roundPlayerRecord_.players_size()) {
+    if (playerIndex >= roundPlayerBetRecord_.players_.size()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
         response.set_message("Player index out of range");
         return false;
     }
     
-    auto* player = roundPlayerRecord_.mutable_players(playerIndex);
+    auto& player = roundPlayerBetRecord_.players_[playerIndex];
     
     // 计算退款金额
     double totalRefund = 0.0;
-    if (player->bets_size() > 0) {
-        totalRefund = player->bets(0).amount();
+    if (!player.bets_.empty()) {
+        totalRefund = player.bets_[0].amount_;
     }
     
     if (totalRefund <= 0) {
@@ -1212,14 +1289,10 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
     double newBalance = user->getBalance() + totalRefund;
     user->setBalance(newBalance);
     
-    // 更新榜单中的余额
-    player->mutable_info()->set_balance(newBalance);
-    
     // 使用updatePlayerCancelBet方法更新退款记录
     updatePlayerCancelBet(loginname, playType, totalRefund);
-    
-    // 设置玩家下注状态为false（取消下注后）
-    playerInGame->setBetStatus(false);
+
+    playerInGame->cancelBetPlayType(playType);
     
     // 设置成功响应
     response.set_code(0);
@@ -1233,21 +1306,236 @@ bool MinesGame::processCancelBet(const std::string& loginname, const std::string
     return true;
 }
 
-bool MinesGame::processPlaceBet(const std::string& loginname, const std::string& requestRoundId,
-                               int32_t playType, double amount, proto::MinesPlaceBetRes& response) {
-    // 写操作：playersMutex_(写) + rankMutex_(写) - 按锁顺序获取
-    std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
-    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
-    
+// 验证下注请求
+bool MinesGame::validateBet(std::shared_ptr<PlayerInGame> playerInGame_inout, const std::string& requestRoundId,
+    int32_t playType, double amount, proto::MinesPlaceBetRes& response) {
+
     // 设置基本响应信息
     response.set_roundid(roundID_);
     response.set_balance(0.0);
-    
+
     // 1. 游戏状态检查
     GameStatus currentStatus = getStatus();
     if (currentStatus != GameStatus::START_JETTON) {
         response.set_code(ErrorCode::BET_NOT_ALLOWED);
         response.set_message("Bet not allowed in current game status");
+        return false;
+    }
+
+    // 2. roundId验证
+    if (!requestRoundId.empty() && requestRoundId != roundID_) {
+        response.set_code(ErrorCode::INVALID_ROUND_ID);
+        response.set_message("Invalid round ID");
+        return false;
+    }
+
+    // 3. 玩法类型检查
+    if (!MinesProPlayType::isValid(playType)) {
+        response.set_code(ErrorCode::INVALID_PLAY_TYPE);
+        response.set_message("Invalid play type");
+        return false;
+    }
+
+    // 4. 下注金额验证
+    if (amount <= 0) {
+        response.set_code(ErrorCode::INVALID_BET_AMOUNT);
+        response.set_message("Invalid bet amount");
+        return false;
+    }
+
+    // 4.1 检查最小下注金额限制
+    if (amount < minBet_) {
+        response.set_code(ErrorCode::BET_AMOUNT_TOO_SMALL);
+        response.set_message("Bet amount is below minimum limit of " + std::to_string(minBet_));
+        return false;
+    }
+
+    // 4.2 检查最大下注金额限制
+    if (amount > maxBet_) {
+        response.set_code(ErrorCode::BET_AMOUNT_TOO_LARGE);
+        response.set_message("Bet amount exceeds maximum limit of " + std::to_string(maxBet_));
+        return false;
+    }
+
+    // 5. 余额检查
+    double currentBalance = playerInGame_inout->getBalance();
+    if (currentBalance < amount) {
+        response.set_code(ErrorCode::INSUFFICIENT_BALANCE);
+        response.set_message("Insufficient balance");
+        response.set_balance(currentBalance);
+        return false;
+    }
+
+    // 验证通过
+    response.set_code(0);
+    response.set_message("Validation passed");
+    response.set_balance(currentBalance);
+
+    return true;
+}
+
+// 同步下注信息到游戏状态（在数据库扣款成功后调用）
+void MinesGame::syncPlayerBet(std::shared_ptr<PlayerInGame> playerInGame, int32_t playType, double amount) {
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
+    if(playerInGame == nullptr || playerInGame->getUser() == nullptr){
+        return;
+    }
+    
+    // 创建下注记录
+    RecordDetail betRecord;
+    betRecord.playType_ = playType;
+    betRecord.amount_ = amount;
+    betRecord.time_ = std::chrono::system_clock::now();
+    betRecord.before_amount_ = playerInGame->getBalance() + amount; 
+    betRecord.after_amount_ = playerInGame->getBalance();
+    
+    // 创建玩家信息
+    PlayerBriefInfo playerInfo;
+    playerInfo.loginname_ = playerInGame->getLoginname(); 
+    playerInfo.nickname_ = playerInGame->getUser()->getNickName();
+    playerInfo.avatar_ = playerInGame->getUser()->getAvatarUrl();
+    playerInfo.player_id_ = playerInGame->getUser()->getPlayerId();
+    playerInfo.original_balance_ = playerInGame->getBalance() + amount;
+    playerInfo.client_ip_ = playerInGame->getUser()->getClientIp();
+    playerInfo.merchant_id_ = playerInGame->getUser()->getMerchantId();
+    
+    // 更新榜单
+    updatePlayerBet(playerInfo, std::move(betRecord));
+    
+    LOG_INFO("Bet synchronized for player %s: playType=%d, amount=%.2f, newBalance=%.2f", 
+             playerInGame->getLoginname().c_str(), playType, amount, playerInGame->getBalance());
+    
+    return;
+}
+
+// 验证取消下注请求
+bool MinesGame::validateCancelBet(std::shared_ptr<PlayerInGame> playerInGame_inout, const std::string& requestRoundId,
+    int32_t playType, proto::MinesCancelBetRes& response,
+    double& refundAmount_out) {
+    // 读锁用于检查排名数据
+    std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
+
+    // 设置基本响应信息
+    response.set_roundid(roundID_);
+    response.set_balance(0.0);
+    response.set_refundamount(0.0);
+
+    // 1. 游戏状态检查 - 只在下注阶段才能取消
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::START_JETTON) {
+        response.set_code(ErrorCode::BET_NOT_ALLOWED);
+        response.set_message("Cancel bet not allowed in current game status");
+        return false;
+    }
+
+    // 2. roundId验证
+    if (!requestRoundId.empty() && requestRoundId != roundID_) {
+        response.set_code(ErrorCode::INVALID_ROUND_ID);
+        response.set_message("Invalid round ID");
+        return false;
+    }
+
+    // 3. 玩法类型检查
+    if (!MinesProPlayType::isValid(playType)) {
+        response.set_code(ErrorCode::INVALID_PLAY_TYPE);
+        response.set_message("Invalid play type");
+        return false;
+    }
+
+    // 4. 检查玩家是否有该玩法的下注
+    std::string playerPlayTypeKey = playerInGame_inout->getLoginname() + "_" + std::to_string(playType);
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
+        response.set_code(ErrorCode::NO_BET_TO_CANCEL);
+        response.set_message("No bet found for this play type");
+        return false;
+    }
+
+    int playerIndex = indexIt->second;
+    if (playerIndex >= roundPlayerBetRecord_.players_.size()) {
+        response.set_code(ErrorCode::NO_BET_TO_CANCEL);
+        response.set_message("Player index out of range");
+        return false;
+    }
+
+    auto& player = roundPlayerBetRecord_.players_[playerIndex];
+
+    // 5. 计算退款金额
+    double refundAmount = 0.0;
+    for (const auto& bet : player.bets_) {
+        if (bet.playType_ == playType) {
+            refundAmount += bet.amount_;
+        }
+    }
+
+    if (refundAmount <= 0) {
+        response.set_code(ErrorCode::NO_BET_TO_CANCEL);
+        response.set_message("No bet amount to cancel");
+        return false;
+    }
+
+    // 验证通过，返回退款金额供后续使用
+    refundAmount_out = refundAmount;
+    response.set_code(0);
+    response.set_message("Validation passed");
+    response.set_balance(playerInGame_inout->getBalance());
+    response.set_refundamount(refundAmount);
+
+    return true;
+}
+
+// 同步取消下注信息到游戏状态
+void MinesGame::syncPlayerCancelBet(std::shared_ptr<PlayerInGame> playerInGame, int32_t playType, double refundAmount) {
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
+    if(playerInGame == nullptr || playerInGame->getUser() == nullptr){
+        LOG_ERROR("PlayerInGame or User is null");
+        return;
+    }
+    
+    const std::string& loginname = playerInGame->getLoginname();
+    
+    // 更新玩家状态
+    playerInGame->cancelBetPlayType(playType);
+    
+    // 移除该玩法的记录
+    std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt != roundPlayerRecordIndex_.end()) {
+        int playerIndex = indexIt->second;
+        if (playerIndex < roundPlayerBetRecord_.players_.size()) {
+            const auto& playerToRemove = roundPlayerBetRecord_.players_[playerIndex];
+            // 直接删除该(玩家+玩法)组合的记录
+            roundPlayerBetRecord_.players_.erase(roundPlayerBetRecord_.players_.begin() + playerIndex);
+            // 重新排序排行榜
+            sortRankByBetAmount();
+        } else {
+            LOG_ERROR("Player index %d out of range for cancel bet", playerIndex);
+        }
+    } else {
+        LOG_WARN("Player %s playType %d not found in rank for cancel bet", loginname.c_str(), playType);
+    }
+    
+    LOG_INFO("Cancel bet synchronized for player %s: playType=%d, refund=%.2f, newBalance=%.2f", 
+             loginname.c_str(), playType, refundAmount, playerInGame->getBalance());
+}
+
+// 验证兑现请求
+bool MinesGame::validateCash(std::shared_ptr<PlayerInGame> playerInGame_inout, 
+                            const std::string& requestRoundId,
+                            int32_t playType, proto::MinesCashRes& response,
+                            double& payoutAmount_out, double& multiplier_out) {
+    std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
+    
+    // 设置基本响应信息
+    response.set_roundid(roundID_);
+    response.set_playtype(playType);
+    response.set_balance(0.0);
+    
+    // 1. 游戏状态检查 - 只在STOP_JETTON阶段才能兑现
+    GameStatus currentStatus = getStatus();
+    if (currentStatus != GameStatus::STOP_JETTON) {
+        response.set_code(ErrorCode::CASH_NOT_ALLOWED);
+        response.set_message("Cash out only allowed during STOP_JETTON phase");
         return false;
     }
     
@@ -1264,105 +1552,269 @@ bool MinesGame::processPlaceBet(const std::string& loginname, const std::string&
         response.set_message("Invalid play type");
         return false;
     }
-    
-    // 4. 下注金额验证
-    if (amount <= 0) {
-        response.set_code(ErrorCode::INVALID_BET_AMOUNT);
-        response.set_message("Invalid bet amount");
-        return false;
-    }
-    
-    // 4.1 检查最小下注金额限制
-    if (amount < minBet_) {
-        response.set_code(ErrorCode::BET_AMOUNT_TOO_SMALL);
-        response.set_message("Bet amount is below minimum limit of " + std::to_string(minBet_));
-        return false;
-    }
-    
-    // 4.2 检查最大下注金额限制
-    if (amount > maxBet_) {
-        response.set_code(ErrorCode::BET_AMOUNT_TOO_LARGE);
-        response.set_message("Bet amount exceeds maximum limit of " + std::to_string(maxBet_));
-        return false;
-    }
-    
-    // 5. 通过loginname查找玩家信息
-    auto playerIt = players_.find(loginname);
-    if (playerIt == players_.end()) {
+
+    // 5. 检查玩家是否有该玩法的下注
+    std::string playerPlayTypeKey = playerInGame_inout->getLoginname() + "_" + std::to_string(playType);
+    auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
+    if (indexIt == roundPlayerRecordIndex_.end()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
-        response.set_message("Player not found in game");
+        response.set_message("Player not found in rank data");
         return false;
     }
     
-    auto playerInGame = playerIt->second;
-    if (!playerInGame) {
+    int playerIndex = indexIt->second;
+    if (playerIndex >= roundPlayerBetRecord_.players_.size()) {
         response.set_code(ErrorCode::PLAYER_NOT_FOUND);
-        response.set_message("Player object not found");
+        response.set_message("Player index out of range");
         return false;
     }
     
-    auto user = playerInGame->getUser();
-    if (!user) {
-        response.set_code(ErrorCode::PLAYER_NOT_FOUND);
-        response.set_message("User object not found");
+    auto& player = roundPlayerBetRecord_.players_[playerIndex];
+    
+    // 6. 检查是否已经兑现过
+    if (playerInGame_inout->hasCashedOut(playType)) {
+        response.set_code(ErrorCode::ALREADY_CASHED_OUT);
+        response.set_message("Already cashed out for this play type");
         return false;
     }
     
-    // 6. 余额检查
-    double currentBalance = user->getBalance();
-    if (currentBalance < amount) {
-        response.set_code(ErrorCode::INSUFFICIENT_BALANCE);
-        response.set_message("Insufficient balance");
-        response.set_balance(currentBalance);
-        return false;
+    // 7. 计算兑现金额
+    double currentMultiplier;
+    bool hasMine;
+    {
+        std::shared_lock<std::shared_mutex> gridLock(gridMutex_);
+        int revealedStars = grid_->getRevealedStarCount();
+        currentMultiplier = getMultiplierForStarCount(revealedStars);
+        hasMine = grid_->hasRevealedMine();
     }
     
-    // 7. 扣除玩家余额
-    double newBalance = currentBalance - amount;
-    user->setBalance(newBalance);
-    
-    // 8. 创建下注记录
-    proto::BetRecord betRecord;
-    betRecord.set_playtype(playType);
-    betRecord.set_amount(amount);
-    
-    // 9. 创建玩家信息
-    proto::PlayerInfo playerInfo;
-    playerInfo.set_loginname(loginname);  // 设置登录名用于数据库操作
-    playerInfo.set_username(user->getUserName()); 
-    playerInfo.set_nickname(user->getNickName());
-    playerInfo.set_avatar(user->getAvatar());
-    playerInfo.set_vip(user->getVipLevel());
-    playerInfo.set_balance(newBalance);
-    playerInfo.set_currency(user->getCurrency());
-    
-    // 10. 获取sessionId用于榜单更新
-    std::string sessionId;
-    auto session = playerInGame->getSession().lock();
-    if (session) {
-        sessionId = session->getSessionId();
+    if (hasMine) {
+        currentMultiplier = 0.0;
     }
     
-    // 11. 更新游戏榜单信息
-    updatePlayerBet(loginname, playerInfo, betRecord);
+    double playTypeBetAmount = 0.0;
+    if (!player.bets_.empty()) {
+        playTypeBetAmount = player.bets_[0].amount_;
+    }
     
-    // 12. 设置玩家下注状态
-    playerInGame->setBetStatus(true);
+    double payoutAmount = playTypeBetAmount * currentMultiplier;
     
-    // 13. 设置成功响应
+    // 检查是否超过最大赔付限制
+    if (payoutAmount > maxWinPerRound_) {
+        payoutAmount = maxWinPerRound_;
+    }
+
+    payoutAmount_out = payoutAmount;
+    multiplier_out = currentMultiplier;
     response.set_code(0);
-    response.set_message("Bet placed successfully");
-    response.set_balance(newBalance);
-    
-    LOG_INFO("Bet placed successfully for player %s: playType=%d, amount=%.2f, newBalance=%.2f", 
-             loginname.c_str(), playType, amount, newBalance);
-    
+    response.set_message("Validation passed");
+    response.set_balance(playerInGame_inout->getBalance());
     return true;
+}
+
+// 同步兑现信息到游戏状态（需要调用者持有rankMutex_写锁）
+void MinesGame::syncPlayerCashInternal(std::shared_ptr<PlayerInGame> playerInGame, int32_t playType, double payoutAmount, double multiplier) {
+    if(playerInGame == nullptr || playerInGame->getUser() == nullptr){
+        LOG_ERROR("PlayerInGame or User is null");
+        return;
+    }
+    
+    const std::string& loginname = playerInGame->getLoginname();
+    
+    // 创建兑现记录
+    ReckonRecord reckon;
+    reckon.playType_ = playType;
+    reckon.amount_ = payoutAmount;
+    reckon.multi_ = multiplier;
+    reckon.reckon_time_ = std::chrono::system_clock::now();
+    reckon.before_amount = playerInGame->getUser()->getBalance() - payoutAmount;
+    reckon.after_amount = playerInGame->getUser()->getBalance();
+    
+    // 使用updatePlayerCash方法更新兑现记录
+    updatePlayerCash(loginname, std::move(reckon));
+    
+    // 标记为已兑现
+    playerInGame->setCashedOut(playType);
+    
+    LOG_INFO("Cash synchronized for player %s: playType=%d, payout=%.2f, multi=%.2f, newBalance=%.2f", 
+             loginname.c_str(), playType, payoutAmount, multiplier, playerInGame->getBalance());
+}
+
+// 同步兑现信息到游戏状态（外部接口，自动获取锁）
+void MinesGame::syncPlayerCash(std::shared_ptr<PlayerInGame> playerInGame, int32_t playType, double payoutAmount, double multiplier) {
+    std::unique_lock<std::shared_mutex> rankLock(rankMutex_);
+    syncPlayerCashInternal(playerInGame, playType, payoutAmount, multiplier);
+}
+
+// 兑现执行器实现
+std::unique_ptr<CashOutExecutor> MinesGame::createCashOutExecutor(bool withDatabase) {
+    if (withDatabase) {
+        auto minesRepo = std::dynamic_pointer_cast<MinesGameRepositoryImpl>(gameRepository_);
+        return std::make_unique<CashOutExecutor>(minesRepo);
+    } else {
+        return std::make_unique<CashOutExecutor>(nullptr);
+    }
+}
+
+CashOutExecutor::Result CashOutExecutor::execute(
+    std::shared_ptr<MinesGame> game,const std::string& round_id, const std::string& loginname, int32_t playType, CashOutMode mode) {
+    
+    Result result;
+    result.success = false;
+    result.payoutAmount = 0.0;
+    result.multiplier = 0.0;
+    
+    std::shared_ptr<PlayerInGame> playerInGame = game->getPlayer(loginname);
+    if (!playerInGame) {
+        result.response.set_code(ErrorCode::PLAYER_NOT_FOUND);
+        result.response.set_message("Player not found in game");
+        return result;
+    }
+    
+    double payoutAmount = 0.0;
+    double multiplier = 0.0;
+    
+    // 1. 验证阶段（所有模式都需要）
+    bool valid = game->validateCash(playerInGame, round_id, playType, result.response, 
+                                   payoutAmount, multiplier);
+    if (!valid) {
+        return result;
+    }
+    
+    // 2. 数据库操作阶段（根据模式决定）
+    if (mode == CashOutMode::IMMEDIATE_DB && repository_) {
+        bool dbSuccess = repository_->updatePlayerReckon(
+            playerInGame->getUser()->getPlayerId(),
+            payoutAmount,
+            game->roundID_,
+            playType,
+            multiplier,
+            playerInGame->getUser()->getClientIp(),
+            playerInGame
+        );
+        
+        if (!dbSuccess) {
+            result.response.set_code(ErrorCode::DATABASE_ERROR);
+            result.response.set_message("Database operation failed");
+            return result;
+        }
+        
+        LOG_DEBUG("Database cash out recorded for player %s, playType %d, amount %.2f", 
+                 loginname.c_str(), playType, payoutAmount);
+    }
+    // 3. 同步游戏状态（所有模式都需要）
+    game->syncPlayerCash(playerInGame, playType, payoutAmount, multiplier);
+    
+    // 4. 对于MEMORY_ONLY模式，保存记录以便后续批量入库
+    if (mode == CashOutMode::MEMORY_ONLY) {
+        MemoryCashOutRecord memoryRecord;
+        memoryRecord.loginname = loginname;
+        memoryRecord.playType = playType;
+        memoryRecord.payoutAmount = payoutAmount;
+        memoryRecord.multiplier = multiplier;
+        memoryRecord.timestamp = std::chrono::system_clock::now();
+        
+        game->memoryCashOutRecords_.push_back(memoryRecord);
+        LOG_DEBUG("Saved cash out record to memory for batch processing: player=%s, playType=%d", 
+                 loginname.c_str(), playType);
+    }
+    
+    // 5. 构建成功结果
+    result.success = true;
+    result.payoutAmount = payoutAmount;
+    result.multiplier = multiplier;
+    result.response.set_code(ErrorCode::SUCCESS);
+    result.response.set_message("Cash out successful");
+    result.response.set_balance(playerInGame->getBalance());
+    
+    // 构建 proto::ReckonRecord
+    proto::ReckonRecord protoReckon;
+    protoReckon.set_playtype(playType);
+    protoReckon.set_amount(payoutAmount);
+    protoReckon.set_multi(multiplier);
+    result.reckonRecord = protoReckon;
+    
+    const char* modeStr = (mode == CashOutMode::IMMEDIATE_DB) ? "IMMEDIATE_DB" : 
+                         (mode == CashOutMode::MEMORY_ONLY) ? "MEMORY_ONLY" : "BATCH_DB";
+    LOG_INFO("Cash out executed (%s) for player %s: playType=%d, payout=%.2f, multi=%.2f", 
+             modeStr, loginname.c_str(), playType, payoutAmount, multiplier);
+    
+    return result;
+}
+
+void MinesGame::writeCashOutRecordsToDatabase() {
+    if (memoryCashOutRecords_.empty()) {
+        return;
+    }
+    
+    LOG_INFO("Writing %zu memory-only cash out records to database at game end", 
+             memoryCashOutRecords_.size());
+    
+    auto repository = std::dynamic_pointer_cast<MinesGameRepositoryImpl>(gameRepository_);
+    int successCount = 0;
+    int failCount = 0;
+    
+    for (const auto& record : memoryCashOutRecords_) {
+        // 查找对应的玩家
+        auto playerIt = players_.find(record.loginname);
+        if (playerIt == players_.end() || !playerIt->second) {
+            LOG_WARN("Player %s not found when writing cash out record to database", 
+                     record.loginname.c_str());
+            failCount++;
+            continue;
+        }
+        
+        auto playerInGame = playerIt->second;
+        if (!playerInGame->getUser()) {
+            LOG_WARN("User info not found for player %s when writing cash out record", 
+                     record.loginname.c_str());
+            failCount++;
+            continue;
+        }
+        
+        bool dbSuccess = repository->updatePlayerReckon(
+            playerInGame->getUser()->getPlayerId(),
+            record.payoutAmount,
+            roundID_,
+            record.playType,
+            record.multiplier,
+            playerInGame->getUser()->getClientIp(),
+            playerInGame
+        );
+        
+        if (dbSuccess) {
+            successCount++;
+            LOG_DEBUG("Written cash out record to database: player=%s, playType=%d, amount=%.2f", 
+                     record.loginname.c_str(), record.playType, record.payoutAmount);
+        } else {
+            failCount++;
+            LOG_WARN("Failed to write cash out record to database: player=%s, playType=%d", 
+                     record.loginname.c_str(), record.playType);
+        }
+    }
+    
+    LOG_INFO("Batch write completed: %d success, %d failed out of %zu total records", 
+             successCount, failCount, memoryCashOutRecords_.size());
+    
+    // 清空内存记录
+    memoryCashOutRecords_.clear();
+}
+
+void MinesGame::settleFailedOrders() {
+    LOG_INFO("Settling losed orders for round %s due to mine explosion", roundID_.c_str());
+    
+    auto repository = std::dynamic_pointer_cast<MinesGameRepositoryImpl>(gameRepository_);
+    int64_t updatedCount = repository->updateFailedOrders(roundID_);
+    
+    if (updatedCount >= 0) {
+        LOG_INFO("Successfully settled %ld losed orders for round %s", updatedCount, roundID_.c_str());
+    } else {
+        LOG_ERROR("Failed to settle orders for round %s", roundID_.c_str());
+    }
 }
 
 void MinesGame::cleanupInactivePlayers() {
     std::vector<std::string> playersToRemove;
-    
     {
         std::shared_lock<std::shared_mutex> lock(playersMutex_);
         for (const auto& [loginname, playerInGame] : players_) {
@@ -1380,7 +1832,6 @@ void MinesGame::cleanupInactivePlayers() {
         LOG_INFO("Cleaning up %d inactive players without bets", playersToRemove.size());
         
         for (const auto& loginname : playersToRemove) {
-            // 使用成员变量 appContext_
             if (!appContext_) {
                 LOG_ERROR("AppContext is null");
                 continue;
@@ -1404,14 +1855,12 @@ void MinesGame::cleanupInactivePlayers() {
 
 void MinesGame::rebuildPlayerPlayTypeToRankMapping() {
     roundPlayerRecordIndex_.clear();
-    
-    // 遍历榜单中的每个条目，重建(玩家,玩法)到索引的映射
-    for (int i = 0; i < roundPlayerRecord_.players_size(); ++i) {
-        const auto& player = roundPlayerRecord_.players(i);
-        const std::string& loginname = player.info().loginname();
+    for (size_t i = 0; i < roundPlayerBetRecord_.players_.size(); ++i) {
+        const auto& player = roundPlayerBetRecord_.players_[i];
+        const std::string& loginname = player.info_.loginname_;
         
-        if (!loginname.empty() && player.bets_size() > 0) {
-            int32_t playType = player.bets(0).playtype();
+        if (!loginname.empty() && !player.bets_.empty()) {
+            int32_t playType = player.bets_[0].playType_;
             std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
             roundPlayerRecordIndex_[playerPlayTypeKey] = i;
             LOG_DEBUG("Rebuilt mapping: %s -> index %d", playerPlayTypeKey.c_str(), i);
@@ -1419,11 +1868,10 @@ void MinesGame::rebuildPlayerPlayTypeToRankMapping() {
     }
     
     LOG_DEBUG("Rebuilt playerPlayType to rank mapping for game %s, %d entries", 
-              roundID_.c_str(), (int)roundPlayerRecordIndex_.size());
+        roundID_.c_str(), roundPlayerRecordIndex_.size());
 }
 
 void MinesGame::updatePlayerCancelBet(const std::string& loginname, int32_t playType, double refundAmount) {
-    // 此方法应在rankMutex_锁保护下调用
     // 创建(玩家,玩法)的唯一键
     std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
     auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
@@ -1434,14 +1882,14 @@ void MinesGame::updatePlayerCancelBet(const std::string& loginname, int32_t play
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= roundPlayerRecord_.players_size()) {
+    if (playerIndex >= roundPlayerBetRecord_.players_.size()) {
         LOG_ERROR("Player index %d out of range for cancel bet", playerIndex);
         return;
     }
     
-    // 直接从榜单中移除这个(玩家,玩法)条目
-    roundPlayerRecord_.mutable_players()->erase(
-        roundPlayerRecord_.mutable_players()->begin() + playerIndex);
+    // 移除这个(玩家,玩法)条目
+    roundPlayerBetRecord_.players_.erase(
+        roundPlayerBetRecord_.players_.begin() + playerIndex);
     
     // 重建映射
     rebuildPlayerPlayTypeToRankMapping();
@@ -1457,7 +1905,6 @@ bool MinesGame::processAutoCash(const std::string& loginname, const std::string&
     // 写操作：playersMutex_(写) - 只需要修改玩家配置
     std::unique_lock<std::shared_mutex> playersLock(playersMutex_);
     
-    // 设置基本响应信息
     response.set_roundid(roundID_);
     response.set_playtype(playType);
     response.set_enable(enable ? 1 : 0);
@@ -1495,13 +1942,6 @@ bool MinesGame::processAutoCash(const std::string& loginname, const std::string&
     bool currentEnabled = playerInGame->getAutoCashEnabled(playType);
     
     if (enable) {
-        // 启用自动兑现
-        if (currentEnabled) {
-            response.set_code(ErrorCode::AUTO_CASH_ALREADY_ENABLED);
-            response.set_message("Auto cash already enabled for this play type");
-            return false;
-        }
-        
         // 验证目标格子
         if (targetGrid < 1 || targetGrid > 21) {
             response.set_code(ErrorCode::INVALID_REQUEST);
@@ -1535,112 +1975,162 @@ bool MinesGame::processAutoCash(const std::string& loginname, const std::string&
 }
 
 void MinesGame::checkAndProcessAutoCash() {
-    // 处理自动兑现逻辑
-    std::vector<std::string> playersToCashOut;
+    std::vector<std::pair<std::string, proto::ReckonRecord>> autoCashResults;
+    int revealedStars = getRevealedStarCount();
+    
+    auto cashExecutor = createCashOutExecutor(false);
+    
+    // 收集需要自动兑现的玩家信息
+    std::vector<std::tuple<std::string, int32_t, std::shared_ptr<PlayerInGame>>> autoCashPlayers;
     
     {
         std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-        for (const auto& [loginname, playerInGame] : players_) {
-            if (playerInGame && playerInGame->isActive() && playerInGame->hasBet()) {
-                // 检查每种玩法的自动兑现配置
-                for (int playType = 1; playType <= 2; playType++) {
-                    if (playerInGame->getAutoCashEnabled(playType)) {
-                        int revealedStars = getRevealedStarCount();
-                        int targetStars = playerInGame->getAutoCashTargetGrid(playType);
-                        
-                        if (revealedStars >= targetStars) {
-                            // 记录需要自动兑现的玩家和玩法
-                            playersToCashOut.push_back(loginname + ":" + std::to_string(playType));
-                            
-                            // 发送兑现响应给玩家
-                            auto session = playerInGame->getSession().lock();
-                            if (session) {
-                                if (!appContext_) {
-                                    LOG_ERROR("AppContext is null");
-                                    continue;
-                                }
-                                
-                                auto tcpServer = appContext_->getTcpServer();
-                                if (tcpServer) {
-                                    // 创建兑现响应
-                                    proto::MinesCashRes cashResponse;
-                                    cashResponse.set_code(ErrorCode::SUCCESS);
-                                    cashResponse.set_message("Auto cash success");
-                                    cashResponse.set_roundid(roundID_);
-                                    cashResponse.set_playtype(playType);
-                                    // 注意：set_multi 不存在，使用其他字段
-                                    
-                                    std::string data;
-                                    cashResponse.SerializeToString(&data);
-                                    tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_MINES_CASH_RES, data);
-                                    LOG_INFO("Auto cash response sent to player %s for playType %d", loginname.c_str(), playType);
-                                }
-                            }
-                        }
+        std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
+        
+        for (size_t i = 0; i < roundPlayerBetRecord_.players_.size(); ++i) {
+            const auto& playerBetInfo = roundPlayerBetRecord_.players_[i];
+            const std::string& loginname = playerBetInfo.info_.loginname_;
+            
+            auto playerIt = players_.find(loginname);
+            if (playerIt == players_.end()) {
+                continue; 
+            }
+            
+            auto playerInGame = playerIt->second;
+            if (!playerInGame) {
+                continue;
+            }
+            
+            for (int playType = MinesProPlayType::LEFT; playType <= MinesProPlayType::RIGHT; playType++) {
+                if (playerInGame->hasCashedOut(playType)) {
+                    continue;
+                }
+                bool hasThisPlayTypeBet = false;
+                for (const auto& bet : playerBetInfo.bets_) {
+                    if (bet.playType_ == playType) {
+                        hasThisPlayTypeBet = true;
+                        break;
+                    }
+                }
+                if (!hasThisPlayTypeBet) {
+                    continue;
+                }
+                
+                // 检查是否启用了自动兑现
+                if (playerInGame->getAutoCashEnabled(playType)) {
+                    int targetStars = playerInGame->getAutoCashTargetGrid(playType);
+                    if (revealedStars >= targetStars) {
+                        autoCashPlayers.emplace_back(loginname, playType, playerInGame);
                     }
                 }
             }
         }
     }
     
-    // 执行自动兑现
-    for (const auto& playerInfo : playersToCashOut) {
-        // 解析玩家信息 "loginname:playType"
-        size_t colonPos = playerInfo.find(':');
-        if (colonPos == std::string::npos) {
-            LOG_ERROR("Invalid player info format: %s", playerInfo.c_str());
-            continue;
+    if (!autoCashPlayers.empty()) {
+        for (const auto& [loginname, playType, playerInGame] : autoCashPlayers) {
+            // 验证兑现
+            double payoutAmount = 0.0;
+            double multiplier = 0.0;
+            proto::MinesCashRes response;
+            
+            bool valid = validateCash(playerInGame, roundID_, playType, response, 
+                                    payoutAmount, multiplier);
+            if (valid && playerInGame) {
+                syncPlayerCashInternal(playerInGame, playType, payoutAmount, multiplier);
+                // 保存到内存记录
+                MemoryCashOutRecord memoryRecord;
+                memoryRecord.loginname = loginname;
+                memoryRecord.playType = playType;
+                memoryRecord.payoutAmount = payoutAmount;
+                memoryRecord.multiplier = multiplier;
+                memoryRecord.timestamp = std::chrono::system_clock::now();
+                memoryCashOutRecords_.push_back(memoryRecord);
+                
+                // 创建响应记录
+                proto::ReckonRecord reckonRecord;
+                reckonRecord.set_playtype(playType);
+                reckonRecord.set_amount(payoutAmount);
+                reckonRecord.set_multi(multiplier);
+                
+                autoCashResults.emplace_back(loginname, reckonRecord);
+                
+                LOG_INFO("Auto cash executed (memory-only) for player %s, playType %d, payout=%.2f", 
+                         loginname.c_str(), playType, payoutAmount);
+            } else {
+                LOG_ERROR("Failed to validate auto cash for player %s, playType %d", 
+                         loginname.c_str(), playType);
+            }
         }
-        
-        std::string loginname = playerInfo.substr(0, colonPos);
-        int playType = std::stoi(playerInfo.substr(colonPos + 1));
-        
-        bool success = executeCashOutInternal(loginname, playType);
-        if (success) {
-            LOG_INFO("Auto cash executed successfully for player %s, playType %d", loginname.c_str(), playType);
+    }
+    
+    // 在锁外发送兑现响应给玩家
+    for (const auto& [loginname, reckonRecord] : autoCashResults) {
+        std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
+        auto playerIt = players_.find(loginname);
+        if (playerIt != players_.end() && playerIt->second) {
+            auto session = playerIt->second->getSession().lock();
+            playersLock.unlock();
+            
+            if (session && appContext_) {
+                auto tcpServer = appContext_->getTcpServer();
+                if (tcpServer) {
+                    // 创建兑现响应
+                    proto::MinesCashRes cashResponse;
+                    cashResponse.set_code(ErrorCode::SUCCESS);
+                    cashResponse.set_roundid(roundID_);
+                    cashResponse.set_playtype(reckonRecord.playtype());
+                    cashResponse.set_balance(playerIt->second->getBalance());
+                    cashResponse.mutable_reckon()->CopyFrom(reckonRecord);
+                    
+                    std::string data;
+                    cashResponse.SerializeToString(&data);
+                    tcpServer->sendToPlayer(session->getSessionId(), Protocol::SC_MINES_CASH_RES, data);
+                    LOG_INFO("Auto cash response sent to player %s for playType %d", loginname.c_str(), reckonRecord.playtype());
+                }
+            }
         } else {
-            LOG_ERROR("Failed to execute auto cash for player %s, playType %d", loginname.c_str(), playType);
+            playersLock.unlock();
         }
     }
 }
 
 void MinesGame::resetAllPlayersCashOutStatus() {
-    // 注意：此方法应在playersMutex_锁保护下调用
     for (const auto& playerPair : players_) {
         const auto& playerInGame = playerPair.second;
         if (playerInGame) {
-            playerInGame->resetCashOutStatus();
-            playerInGame->resetBetStatus();  // 同时重置下注状态
+            playerInGame->resetCashOutPlayType();
+            playerInGame->resetBetPlayType(); 
         }
     }
     
     LOG_INFO("Reset cash out and bet status for all players in game %s", roundID_.c_str());
 }
 
-bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t playType) {
+std::optional<proto::ReckonRecord> MinesGame::executeCashOutInternal(const std::string& loginname, int32_t playType) {
 
     auto playerIt = players_.find(loginname);
     if (playerIt == players_.end()) {
         LOG_ERROR("Player %s not found for internal cash out", loginname.c_str());
-        return false;
+        return std::nullopt;
     }
     
     auto playerInGame = playerIt->second;
     if (!playerInGame) {
         LOG_ERROR("Player object not found for internal cash out");
-        return false;
+        return std::nullopt;
     }
     
     auto user = playerInGame->getUser();
     if (!user) {
         LOG_ERROR("User object not found for internal cash out");
-        return false;
+        return std::nullopt;
     }
     
     // 检查是否已经兑现过
     if (playerInGame->hasCashedOut(playType)) {
         LOG_WARN("Player %s playType %d already cashed out", loginname.c_str(), playType);
-        return false;
+        return std::nullopt;
     }
     
     // 查找榜单条目
@@ -1648,25 +2138,17 @@ bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t pla
     auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
     if (indexIt == roundPlayerRecordIndex_.end()) {
         LOG_ERROR("Player %s playType %d not found in rank data", loginname.c_str(), playType);
-        return false;
+        return std::nullopt;
     }
     
     int playerIndex = indexIt->second;
-    if (playerIndex >= roundPlayerRecord_.players_size()) {
+    if (playerIndex >= roundPlayerBetRecord_.players_.size()) {
         LOG_ERROR("Player index %d out of range", playerIndex);
-        return false;
+        return std::nullopt;
     }
     
-    auto* player = roundPlayerRecord_.mutable_players(playerIndex);
-    
-    // 检查是否已经兑现过（榜单检查）
-    for (const auto& reckon : player->reckons()) {
-        if (reckon.playtype() == playType) {
-            LOG_WARN("Player %s playType %d already cashed out in rank data", loginname.c_str(), playType);
-            return false;
-        }
-    }
-    
+    auto& player = roundPlayerBetRecord_.players_[playerIndex];
+
     // 计算兑现金额 - 需要临时获取gridMutex_读锁
     double currentMultiplier;
     bool hasMine;
@@ -1682,8 +2164,8 @@ bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t pla
     }
     
     double playTypeBetAmount = 0.0;
-    if (player->bets_size() > 0) {
-        playTypeBetAmount = player->bets(0).amount();
+    if (!player.bets_.empty()) {
+        playTypeBetAmount = player.bets_[0].amount_;
     }
     
     double payoutAmount = playTypeBetAmount * currentMultiplier;
@@ -1696,25 +2178,31 @@ bool MinesGame::executeCashOutInternal(const std::string& loginname, int32_t pla
     }
     
     // 创建兑现记录
-    proto::ReckonRecord reckon;
-    reckon.set_playtype(playType);
-    reckon.set_amount(payoutAmount);
-    reckon.set_multi(currentMultiplier);
-    
+    ReckonRecord reckon;
+    reckon.playType_ = playType;
+    reckon.amount_ = payoutAmount;
+    reckon.multi_ = currentMultiplier;
+    reckon.reckon_time_ = std::chrono::system_clock::now();
+    reckon.before_amount = user->getBalance();
     // 更新玩家余额
     double newBalance = user->getBalance() + payoutAmount;
     user->setBalance(newBalance);
+    reckon.after_amount = newBalance;
+
+    proto::ReckonRecord returnReckon;
+    returnReckon.set_playtype(playType);
+    returnReckon.set_amount(payoutAmount);
+    returnReckon.set_multi(currentMultiplier);
     
-    // 更新榜单中的余额
-    player->mutable_info()->set_balance(newBalance);
+    updatePlayerCash(loginname, std::move(reckon));
     
-    // 使用updatePlayerCash方法更新兑现记录
-    updatePlayerCash(loginname, reckon);
+    // 标记为已兑现
+    playerInGame->setCashedOut(playType);
     
     LOG_INFO("Internal cash out successful for player %s: playType=%d, payout=%.2f, multi=%.2f, newBalance=%.2f", 
              loginname.c_str(), playType, payoutAmount, currentMultiplier, newBalance);
     
-    return true;
+    return returnReckon;
 }
 
 void MinesGame::handlePlayerDisconnect(const std::string& loginname) {
@@ -1740,7 +2228,6 @@ void MinesGame::handlePlayerDisconnect(const std::string& loginname) {
         // 检查玩家是否有需要立即兑现的玩法
         for (int32_t playType = MinesProPlayType::LEFT; playType <= MinesProPlayType::RIGHT; ++playType) {
             if (!playerInGame->getAutoCashEnabled(playType) && !playerInGame->hasCashedOut(playType)) {
-                // 检查是否有该玩法的下注
                 std::string playerPlayTypeKey = loginname + "_" + std::to_string(playType);
                 bool hasPlayTypeBet = false;
                 {
@@ -1748,9 +2235,9 @@ void MinesGame::handlePlayerDisconnect(const std::string& loginname) {
                     auto indexIt = roundPlayerRecordIndex_.find(playerPlayTypeKey);
                     if (indexIt != roundPlayerRecordIndex_.end()) {
                         int playerIndex = indexIt->second;
-                        if (playerIndex < roundPlayerRecord_.players_size()) {
-                            const auto& player = roundPlayerRecord_.players(playerIndex);
-                            if (player.bets_size() > 0 && player.bets(0).playtype() == playType) {
+                        if (playerIndex < roundPlayerBetRecord_.players_.size()) {
+                            const auto& player = roundPlayerBetRecord_.players_[playerIndex];
+                            if (!player.bets_.empty() && player.bets_[0].playType_ == playType) {
                                 hasPlayTypeBet = true;
                             }
                         }
@@ -1758,148 +2245,24 @@ void MinesGame::handlePlayerDisconnect(const std::string& loginname) {
                 }
                 
                 if (hasPlayTypeBet) {
-                    // 执行立即兑现
                     LOG_INFO("Player %s disconnected in STOP_JETTON phase, executing immediate cash out for playType=%d", 
                              loginname.c_str(), playType);
                     
-                    // 调用游戏的兑现逻辑
-                    proto::MinesCashRes response;
-                    bool success = processCashOut(loginname, roundID_, playType, response);
+                    // 使用统一的兑现执行器（IMMEDIATE_DB模式）
+                    auto cashExecutor = createCashOutExecutor(true); 
+                    auto result = cashExecutor->execute(std::dynamic_pointer_cast<MinesGame>(shared_from_this()), roundID_, loginname, playType, CashOutMode::IMMEDIATE_DB);
                     
-                    if (success) {
+                    if (result.success) {
                         LOG_INFO("Immediate cash out successful for disconnected player %s: playType=%d, payout=%.2f", 
-                                 loginname.c_str(), playType, 
-                                 response.has_reckon() ? response.reckon().amount() : 0.0);
+                                 loginname.c_str(), playType, result.payoutAmount);
                     } else {
                         LOG_WARN("Immediate cash out failed for disconnected player %s: playType=%d, reason=%s", 
-                                 loginname.c_str(), playType, response.message().c_str());
+                                 loginname.c_str(), playType, result.response.message().c_str());
                     }
                 }
             }
         }
     }
     
-    // 最后设置玩家为非活跃状态
     setPlayerInactive(loginname);
 }
- 
-// 收集余额更新数据
-std::vector<PlayerBalanceUpdate> MinesGame::collectBalanceUpdates() {
-    std::vector<PlayerBalanceUpdate> updates;
-    std::shared_lock<std::shared_mutex> rankLock(rankMutex_);
-    
-    LOG_INFO("Collecting balance updates for game %s", roundID_.c_str());
-    
-    for (const auto& player : roundPlayerRecord_.players()) {
-        // 从player.info()获取基本信息
-        const auto& playerInfo = player.info();
-        
-        // 尝试从玩家下注和派奖记录中获取信息
-        double betAmount = 0.0;
-        double profitAmount = 0.0;
-        int32_t playType = 0;
-        
-        // 获取下注信息
-        for (const auto& bet : player.bets()) {
-            betAmount += bet.amount();
-            playType = bet.playtype();
-        }
-        
-        // 获取派奖信息
-        for (const auto& reckon : player.reckons()) {
-            profitAmount += reckon.amount();
-        }
-        
-        // 跳过无效记录
-        if (playType == 0 || betAmount <= 0.0) {
-            continue;
-        }
-        
-        // 处理所有下过注的玩家，不管是否有派奖
-        PlayerBalanceUpdate update;
-        update.loginName = playerInfo.loginname();
-        
-        // 正确计算原始余额: 当前余额 - 派奖金额 + 下注金额
-        update.originalBalance = playerInfo.balance() - profitAmount + betAmount;
-        update.newBalance = playerInfo.balance();
-        update.reason = "mines_game_result_" + roundID_;
-        
-        updates.push_back(update);
-        
-        LOG_INFO("Player %s balance update: original=%.2f, new=%.2f, bet=%.2f, profit=%.2f", 
-                 playerInfo.loginname().c_str(), 
-                 update.originalBalance,
-                 update.newBalance,
-                 betAmount,
-                 profitAmount);
-    }
-    
-    LOG_INFO("Collected %lu balance updates", updates.size());
-    return updates;
-}
-
-// 处理余额更新结果
-void MinesGame::processBalanceUpdateResults(const std::vector<PlayerBalanceUpdateResult>& results) {
-    for (const auto& result : results) {
-        if (result.success) {
-            LOG_INFO("Balance update successful for player %s: %.2f -> %.2f", 
-                     result.loginName.c_str(), result.originalBalance, result.actualBalance);
-            
-            // 更新游戏中的玩家余额
-            std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-            auto playerIt = players_.find(result.loginName);
-            if (playerIt != players_.end() && playerIt->second) {
-                auto user = playerIt->second->getUser();
-                if (user) {
-                    user->setBalance(result.actualBalance);
-                    LOG_DEBUG("Updated player %s balance in game to %.2f", 
-                             result.loginName.c_str(), result.actualBalance);
-                }
-            }
-        } else {
-            LOG_ERROR("Balance update failed for player %s: %s", 
-                     result.loginName.c_str(), result.errorMessage.c_str());
-            
-            // 处理余额更新失败的情况
-            if (result.errorMessage.find("Original balance mismatch") != std::string::npos) {
-                // 余额不匹配，需要刷新玩家余额
-                // 使用成员变量 dbFactory_
-                if (!dbFactory_) {
-                    LOG_ERROR("DatabaseFactory is null");
-                    continue;
-                }
-                
-                auto mysqlClient = dbFactory_->getMySQLClient();
-                if (mysqlClient) {
-                    try {
-                        std::string sql = "SELECT CAST(amount AS CHAR) FROM sys_player WHERE login_name = ?";
-                        std::string amountStr;
-                        
-                        mysqlClient->queryWithCallback(sql, {result.loginName}, [&](const mysqlx::Row& row) {
-                            amountStr = row[0].get<std::string>();
-                        });
-                        
-                        if (!amountStr.empty()) {
-                            double actualBalance = std::stod(amountStr);
-                            
-                            // 更新游戏中的玩家余额
-                            std::shared_lock<std::shared_mutex> playersLock(playersMutex_);
-                            auto playerIt = players_.find(result.loginName);
-                            if (playerIt != players_.end() && playerIt->second) {
-                                auto user = playerIt->second->getUser();
-                                if (user) {
-                                    user->setBalance(actualBalance);
-                                    LOG_INFO("Updated player %s balance from database: %.2f", 
-                                             result.loginName.c_str(), actualBalance);
-                                }
-                            }
-                        }
-                    } catch (const std::exception& e) {
-                        LOG_ERROR("Exception while refreshing player balance: %s", e.what());
-                    }
-                }
-            }
-        }
-    }
-}
- 

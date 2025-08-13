@@ -24,6 +24,33 @@ const (
 // 添加一个全局互斥锁
 var connMutex sync.Mutex
 
+// 添加记录前后金额和时间的结构体
+type BetDetail struct {
+	BeforeAmount float64
+	Amount       float64
+	AfterAmount  float64
+	Time         time.Time
+}
+
+// 添加记录兑现前后金额和时间的结构体
+type CashDetail struct {
+	PlayType     int32
+	BeforeAmount float64
+	Amount       float64
+	AfterAmount  float64
+	Multi        float64
+	Time         time.Time
+}
+
+// 添加记录取消下注前后金额和时间的结构体
+type CancelBetDetail struct {
+	PlayType     int32
+	RefundAmount float64
+	BeforeAmount float64
+	AfterAmount  float64
+	Time         time.Time
+}
+
 // BotMode 机器人模式
 type BotMode int
 
@@ -34,18 +61,20 @@ const (
 
 // Player 玩家对象
 type Player struct {
-	Username    string
-	Loginname   string
-	Nickname    string
-	Avatar      string
-	VIP         int32
-	Balance     float64
-	Currency    string
-	SessionID   string
-	RoundID     string
-	GameStatus  int32   // 0-init 1-start jetton 2-stop jetton 3-settled
-	BetPlayType int32   // 记录下注的玩法类型，0表示未下注
-	Mode        BotMode // 机器人运行模式
+	Username         string
+	Loginname        string
+	Nickname         string
+	Avatar           string
+	Balance          float64
+	Currency         string
+	SessionID        string
+	RoundID          string
+	GameStatus       int32                     // 0-init 1-start jetton 2-stop jetton 3-settled
+	BetPlayType      int32                     // 记录下注的玩法类型，0表示未下注
+	Mode             BotMode                   // 机器人运行模式
+	BetDetails       map[int32][]BetDetail     // 记录每种玩法的下注详情
+	CashDetails      map[int32]CashDetail      // 记录每种玩法的兑现详情
+	CancelBetDetails map[int32]CancelBetDetail // 记录每种玩法的取消下注详情
 }
 
 // Pack 按照包头格式打包消息
@@ -127,7 +156,10 @@ func main() {
 
 	// 创建玩家对象
 	player := &Player{
-		Mode: mode,
+		Mode:             mode,
+		BetDetails:       make(map[int32][]BetDetail),
+		CashDetails:      make(map[int32]CashDetail),
+		CancelBetDetails: make(map[int32]CancelBetDetail),
 	}
 
 	// 发送登录请求
@@ -201,6 +233,9 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 	log.Printf("响应消息: %s", loginResp.Message)
 
 	if loginResp.Code != 0 {
+		// 失败时打印时间、errorcode、loginname
+		log.Printf("FAILED LOGIN - Time: %s, ErrorCode: %d, LoginName: %s", 
+			time.Now().Format("2006-01-02 15:04:05"), loginResp.Code, loginResp.Loginname)
 		return fmt.Errorf("登录失败: %s (错误码: %d)", loginResp.Message, loginResp.Code)
 	}
 
@@ -210,7 +245,6 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 		player.Loginname = loginResp.Info.Loginname
 		player.Nickname = loginResp.Info.Nickname
 		player.Avatar = loginResp.Info.Avatar
-		player.VIP = loginResp.Info.Vip
 		player.Balance = loginResp.Info.Balance
 		player.Currency = loginResp.Info.Currency
 		player.SessionID = sessionID
@@ -220,7 +254,6 @@ func loginToGame(conn *websocket.Conn, player *Player) error {
 		log.Printf("  登录名: %s", player.Loginname)
 		log.Printf("  昵称: %s", player.Nickname)
 		log.Printf("  头像: %s", player.Avatar)
-		log.Printf("  VIP等级: %d", player.VIP)
 		log.Printf("  余额: %.2f %s", player.Balance, player.Currency)
 		log.Printf("  会话ID: %s", player.SessionID)
 	}
@@ -407,9 +440,16 @@ func handleGameSnapshot(conn *websocket.Conn, payload []byte, player *Player) {
 	log.Printf("当前索引: %d", snapshot.CurIndex)
 	log.Printf("当前倍数: %.2f", snapshot.CurMulti)
 	log.Printf("游戏结果数量: %d", len(snapshot.Result))
-	for i, result := range snapshot.Result {
-		log.Printf("  结果[%d]: result=%d, multi=%.2f, index=%d", i, result.Result, result.Multi, result.Index)
+
+	// 根据游戏状态显示hash和seed
+	if snapshot.Status == 1 || snapshot.Status == 2 || snapshot.Status == 3 {
+		log.Printf("结果哈希: %s", snapshot.Hash)
 	}
+
+	if snapshot.Status == 3 {
+		log.Printf("结果种子: %s", snapshot.Seed)
+	}
+
 	log.Println("================================================")
 
 	// 如果游戏状态是START_JETTON且剩余时间充足，触发下注
@@ -434,6 +474,7 @@ func handleStartJettonNotify(conn *websocket.Conn, payload []byte, player *Playe
 	log.Printf("回合ID: %s", startNotify.RoundId)
 	log.Printf("游戏类型: %s", startNotify.Gametype)
 	log.Printf("下注持续时间: %d秒", startNotify.Duration)
+	log.Printf("结果哈希: %s", startNotify.Hash)
 	log.Printf("机器人模式: %v", player.Mode)
 	log.Println("================================================")
 
@@ -447,6 +488,7 @@ func handleStartJettonNotify(conn *websocket.Conn, payload []byte, player *Playe
 
 // sendPlaceBetWithRetry 带重试机制的下注请求
 func sendPlaceBetWithRetry(conn *websocket.Conn, player *Player, playType int32, amount float64) bool {
+	// 不再需要在这里记录，在响应处理中记录即可
 	placeBetReq := &proto.MinesPlaceBetReq{
 		Loginname: player.Loginname,
 		RoundId:   player.RoundID,
@@ -535,7 +577,6 @@ func handleStopJettonNotify(conn *websocket.Conn, payload []byte, player *Player
 	log.Printf("==================== 停止下注 ====================")
 	log.Printf("回合ID: %s", stopNotify.RoundId)
 	log.Printf("游戏类型: %s", stopNotify.GameType)
-	log.Printf("停止时间戳: %d", stopNotify.StopTime)
 	log.Printf("机器人模式: %v", player.Mode)
 	log.Println("================================================")
 
@@ -625,6 +666,9 @@ func handlePlaceBetResponse(conn *websocket.Conn, payload []byte, player *Player
 
 	// 检查是否是服务器忙碌或死锁相关错误
 	if betResp.Code != 0 {
+		// 失败时打印时间、errorcode、loginname
+		log.Printf("❌ FAILED BET - Time: %s, ErrorCode: %d, LoginName: %s", 
+			time.Now().Format("2006-01-02 15:04:05"), betResp.Code, player.Loginname)
 		log.Printf("⚠️  下注失败 - 错误码: %d, 消息: %s", betResp.Code, betResp.Message)
 		if betResp.Message == "Game is busy, please try again" ||
 			betResp.Message == "Game is transitioning, please wait" {
@@ -632,6 +676,29 @@ func handlePlaceBetResponse(conn *websocket.Conn, payload []byte, player *Player
 		}
 	} else {
 		log.Printf("✅ 下注成功")
+
+		// 记录下注详情
+		if betResp.Bet != nil {
+			playType := betResp.Bet.PlayType
+			amount := betResp.Bet.Amount
+			beforeAmount := player.Balance + amount // 估算下注前余额
+			afterAmount := betResp.Balance
+
+			// 创建下注详情记录
+			betDetail := BetDetail{
+				BeforeAmount: beforeAmount,
+				Amount:       amount,
+				AfterAmount:  afterAmount,
+				Time:         time.Now(),
+			}
+
+			// 添加到玩家的下注详情记录中
+			player.BetDetails[playType] = append(player.BetDetails[playType], betDetail)
+
+			log.Printf("记录下注详情: 类型=%d, 前余额=%.2f, 金额=%.2f, 后余额=%.2f",
+				playType, beforeAmount, amount, afterAmount)
+		}
+
 		// 更新玩家余额
 		player.Balance = betResp.Balance
 
@@ -661,9 +728,34 @@ func handleCancelBetResponse(payload []byte, player *Player) {
 
 	// 检查取消下注结果
 	if cancelResp.Code != 0 {
+		// 失败时打印时间、errorcode、loginname
+		log.Printf("❌ FAILED CANCEL_BET - Time: %s, ErrorCode: %d, LoginName: %s", 
+			time.Now().Format("2006-01-02 15:04:05"), cancelResp.Code, player.Loginname)
 		log.Printf("⚠️  取消下注失败 - 错误码: %d, 消息: %s", cancelResp.Code, cancelResp.Message)
 	} else {
 		log.Printf("✅ 取消下注成功，退还金额: %.2f", cancelResp.RefundAmount)
+
+		// 记录取消下注详情
+		playType := cancelResp.PlayType
+		refundAmount := cancelResp.RefundAmount
+		beforeAmount := player.Balance // 当前余额是取消前的余额
+		afterAmount := cancelResp.Balance
+
+		// 创建取消下注详情记录
+		cancelBetDetail := CancelBetDetail{
+			PlayType:     playType,
+			RefundAmount: refundAmount,
+			BeforeAmount: beforeAmount,
+			AfterAmount:  afterAmount,
+			Time:         time.Now(),
+		}
+
+		// 添加到玩家的取消下注详情记录中
+		player.CancelBetDetails[playType] = cancelBetDetail
+
+		log.Printf("记录取消下注详情: 类型=%d, 前余额=%.2f, 退款金额=%.2f, 后余额=%.2f",
+			playType, beforeAmount, refundAmount, afterAmount)
+
 		// 更新玩家余额
 		player.Balance = cancelResp.Balance
 		// 重置下注状态
@@ -692,9 +784,36 @@ func handleCashResponse(payload []byte, player *Player) {
 
 	// 检查兑现结果
 	if cashResp.Code != 0 {
+		// 失败时打印时间、errorcode、loginname
+		log.Printf("❌ FAILED CASH - Time: %s, ErrorCode: %d, LoginName: %s", 
+			time.Now().Format("2006-01-02 15:04:05"), cashResp.Code, player.Loginname)
 		log.Printf("⚠️  兑现失败 - 错误码: %d, 消息: %s", cashResp.Code, cashResp.Message)
 	} else {
 		log.Printf("✅ 兑现成功")
+		// 记录兑现详情
+		if cashResp.Reckon != nil {
+			playType := cashResp.Reckon.PlayType
+			amount := cashResp.Reckon.Amount
+			beforeAmount := player.Balance - amount // 估算兑现前余额
+			afterAmount := cashResp.Balance
+			multi := cashResp.Reckon.Multi
+
+			// 创建兑现详情记录
+			cashDetail := CashDetail{
+				PlayType:     playType,
+				BeforeAmount: beforeAmount,
+				Amount:       amount,
+				AfterAmount:  afterAmount,
+				Multi:        multi,
+				Time:         time.Now(),
+			}
+
+			// 添加到玩家的下注详情记录中
+			player.CashDetails[playType] = cashDetail
+
+			log.Printf("记录兑现详情: 类型=%d, 前余额=%.2f, 金额=%.2f, 后余额=%.2f, 倍数=%.2f",
+				playType, beforeAmount, amount, afterAmount, multi)
+		}
 		// 更新玩家余额
 		player.Balance = cashResp.Balance
 	}
@@ -713,12 +832,54 @@ func handleRankInfoNotify(payload []byte) {
 	log.Printf("回合ID: %s", rankInfo.RoundId)
 	log.Printf("游戏类型: %s", rankInfo.GameType)
 	log.Printf("玩家数量: %d", len(rankInfo.Players))
-	for i, playerSnap := range rankInfo.Players {
-		if playerSnap.Info != nil {
-			log.Printf("  玩家[%d]: %s, 余额=%.2f", i, playerSnap.Info.Username, playerSnap.Info.Balance)
-			log.Printf("    下注记录数: %d", len(playerSnap.Bets))
-			log.Printf("    派奖记录数: %d", len(playerSnap.Reckons))
+
+	// 只显示前3个玩家的详细信息，避免日志过多
+	maxDetailPlayers := 3
+	if len(rankInfo.Players) > 0 {
+		displayCount := min(len(rankInfo.Players), maxDetailPlayers)
+		log.Printf("显示前%d名玩家详细信息:", displayCount)
+
+		for i := 0; i < displayCount; i++ {
+			playerSnap := rankInfo.Players[i]
+			if playerSnap.Info != nil {
+				log.Printf("  玩家[%d]: %s (昵称: %s), 余额=%.2f",
+					i, playerSnap.Info.Loginname, playerSnap.Info.Nickname, playerSnap.Info.Balance)
+
+				// 显示下注记录
+				if len(playerSnap.Bets) > 0 {
+					log.Printf("    下注记录数: %d", len(playerSnap.Bets))
+					for j, bet := range playerSnap.Bets {
+						log.Printf("      下注[%d]: 类型=%d, 金额=%.2f",
+							j, bet.PlayType, bet.Amount)
+					}
+				}
+
+				// 显示派奖记录
+				if len(playerSnap.Reckons) > 0 {
+					log.Printf("    派奖记录数: %d", len(playerSnap.Reckons))
+					for j, reckon := range playerSnap.Reckons {
+						log.Printf("      派奖[%d]: 类型=%d, 金额=%.2f, 倍数=%.2f",
+							j, reckon.PlayType, reckon.Amount, reckon.Multi)
+					}
+				}
+			}
 		}
+
+		// 如果玩家数量超过显示的数量，只显示剩余玩家数量
+		if len(rankInfo.Players) > displayCount {
+			log.Printf("  ...以及其他%d名玩家", len(rankInfo.Players)-displayCount)
+		}
+	} else {
+		log.Printf("榜单中没有玩家")
 	}
+
 	log.Println("================================================")
+}
+
+// min 返回两个整数中的较小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

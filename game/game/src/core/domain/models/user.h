@@ -3,8 +3,6 @@
 
 #include <string>
 #include <cstdint>
-#include <memory>
-#include <decimal/decimal>
 
 // 用户领域模型 - 表示系统中的玩家用户
 class User {
@@ -15,45 +13,43 @@ public:
         Disabled = 1
     };
     
-    // 构造函数
-    User(int64_t playerId, 
-         int avatarId, 
+    User(uint64_t playerId, 
+         const std::string& avatarUrl, 
          const std::string& loginName,
          const std::string& username,
          const std::string& nickName,
          double amount,
-         int vipLevel,
-         const std::string& currency_,
-         Status playerStatus);
+         const std::string& currency,
+         Status playerStatus,
+         int32_t merchantId);
     
     // 获取用户信息
-    int64_t getPlayerId() const { return playerId_; }
-    int getAvatarId() const { return avatarId_; }
+    uint64_t getPlayerId() const { return playerId_; }
+    const std::string& getAvatarUrl() const { return avatarUrl_; }
     const std::string& getLoginName() const { return loginName_; }
     const std::string& getUserName() const { return username_; }
     const std::string& getNickName() const { return nickName_; }
     double getBalance() const { return amount_; }
-    int getVipLevel() const { return vipLevel_; }
     const std::string& getCurrency() const { return currency_; }
     Status getStatus() const { return playerStatus_; }
-    std::string getAvatar() const { return std::to_string(avatarId_); }
     bool isActive() const { return playerStatus_ == Status::Normal; }
-    
-    // 余额更新方法 - 支持游戏中的余额变化
+    const std::string& getClientIp() const { return clientIp_; }
+    void setClientIp(const std::string& clientIp) { clientIp_ = clientIp; }
     void setBalance(double newBalance) { amount_ = newBalance; }
     void addBalance(double amount) { amount_ += amount; }
     void subtractBalance(double amount) { amount_ -= amount; }
-    
+    int32_t getMerchantId() const { return merchantId_; }
 private:
-    int64_t playerId_;
-    int avatarId_;
+    uint64_t playerId_;
+    std::string avatarUrl_;
     std::string loginName_;
     std::string username_;
     std::string nickName_;
     double amount_;
-    int vipLevel_;
     Status playerStatus_;
     std::string currency_;
+    std::string clientIp_;
+    int32_t merchantId_;
 };
 
 #endif // USER_H

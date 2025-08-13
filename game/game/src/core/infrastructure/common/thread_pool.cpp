@@ -1,5 +1,5 @@
 #include "thread_pool.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 
 ThreadPool::ThreadPool(size_t numThreads) : stopping(false) {
     for (size_t i = 0; i < numThreads; ++i) {

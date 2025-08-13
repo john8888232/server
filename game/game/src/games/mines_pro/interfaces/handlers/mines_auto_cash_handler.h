@@ -14,7 +14,6 @@ class MinesAutoCashHandler : public IMessageHandler {
 public:
     using ResponseCallback = std::function<void(const std::string&, uint32_t, const std::string&)>;
     
-    // 简化构造函数，使用依赖容器
     MinesAutoCashHandler(ResponseCallback responseCallback);
     
     // 实现IMessageHandler接口

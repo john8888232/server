@@ -4,8 +4,7 @@
 #include <memory>
 #include <string>
 #include "core/application/interfaces/i_user_service.h"
-#include "core/domain/models/user.h"
-#include "core/infrastructure/proto/game.pb.h"
+#include "core/infrastructure/protogen/game.pb.h"
 #include "core/domain/repositories/i_user_repository.h"
 
 // 用户服务 - 应用层服务，处理用户相关业务逻辑

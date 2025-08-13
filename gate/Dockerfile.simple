@@ -1,0 +1,24 @@
+# 简化版Dockerfile - 只包含运行时
+FROM ubuntu:22.04
+
+# 设置非交互式安装
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 创建应用目录
+WORKDIR /app
+
+# 复制预编译的二进制文件
+COPY cmd/gateway/bin/gateway ./gateway
+
+# 创建配置和日志目录
+RUN mkdir -p /app/logs
+
+# 设置文件权限
+RUN chmod +x gateway
+
+# 端口
+EXPOSE 5600
+EXPOSE 5700
+
+# 默认启动Gateway服务
+CMD ["./gateway"]

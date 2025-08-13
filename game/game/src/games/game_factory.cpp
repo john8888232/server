@@ -1,5 +1,5 @@
 #include "game_factory.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 
 GameFactory::GameFactory() : enabled_(true) {
 }
@@ -21,11 +21,10 @@ void GameFactory::setEnabled(bool enabled) {
 }
 
 void GameFactory::setConfig(const json& config) {
-    json oldConfig = config_;
     config_ = config;
     LOG_INFO("Game %s config updated", getGameType().c_str());
     
-    onConfigUpdated(oldConfig, config);
+    onConfigUpdated(config);
 }
 
 

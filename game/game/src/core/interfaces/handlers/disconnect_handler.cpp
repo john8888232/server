@@ -2,7 +2,7 @@
 #include "core/infrastructure/network/protocol.h"
 #include "core/infrastructure/common/app_context.h"
 #include "core/infrastructure/common/dependency_container.h"
-#include <third_party/libuv_cpp/include/LogWriter.hpp>
+#include "third_party/libuv_cpp/include/LogWriter.hpp"
 
 extern DependencyContainer& getDependencyContainer();
 
@@ -48,7 +48,6 @@ void DisconnectHandler::immediateCleanupPlayerSession(const std::string& session
              loginname.c_str(), sessionId.c_str());
     
     // 1. 在游戏中将该玩家标记为非活跃状态
-    // 从依赖容器获取AppContext
     auto& container = getDependencyContainer();
     auto appContext = container.resolve<AppContext>();
     if (!appContext) {

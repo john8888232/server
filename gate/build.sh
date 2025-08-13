@@ -170,7 +170,7 @@ clean() {
     print_info "Cleaning binary files..."
     
     # 清理Go程序二进制文件
-    for program in gameserver_stub gateway test mines_bot; do
+    for program in gameserver_stub gateway mines_bot; do
         local bin_file="cmd/$program/bin/$program"
         if [[ -f "$bin_file" ]]; then
             rm -f "$bin_file"
@@ -203,13 +203,12 @@ show_help() {
     echo "程序名:"
     echo "  gameserver_stub  编译游戏服务器存根"
     echo "  gateway          编译网关服务器"
-    echo "  test            编译测试客户端"
     echo "  mines_bot       编译mines机器人"
     echo ""
     echo "示例:"
     echo "  $0                    # 编译所有程序和proto文件"
     echo "  $0 gateway            # 只编译gateway"
-    echo "  $0 gateway test       # 编译gateway和test"
+    echo "  $0 gateway mines_bot  # 编译gateway和mines_bot"
     echo "  $0 --proto            # 只编译proto文件"
     echo "  $0 --clean            # 清理所有二进制文件"
 }
@@ -241,7 +240,7 @@ main() {
                 build_all=false
                 shift
                 ;;
-            gameserver_stub|gateway|test|mines_bot)
+            gameserver_stub|gateway|mines_bot)
                 programs+=("$1")
                 build_all=false
                 shift
@@ -278,7 +277,7 @@ main() {
     
     # 确定要编译的程序列表
     if [[ "$build_all" == true ]] || [[ ${#programs[@]} -eq 0 ]]; then
-        programs=("gameserver_stub" "gateway" "test" "mines_bot")
+        programs=("gameserver_stub" "gateway" "mines_bot")
     fi
     
     print_info "Starting build process..."

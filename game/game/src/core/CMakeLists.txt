@@ -1,5 +1,5 @@
 # 设置proto文件输出目录
-set(PROTO_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/src/core/infrastructure/proto")
+set(PROTO_OUTPUT_DIR "${CMAKE_SOURCE_DIR}/src/core/infrastructure/protogen")
 
 # 创建输出目录
 file(MAKE_DIRECTORY ${PROTO_OUTPUT_DIR})
@@ -69,9 +69,7 @@ target_link_libraries(core PUBLIC
     ${HIREDIS_LIBRARY}
     ${REDIS_PLUS_PLUS_LIBRARY}
     ${ppconsul_LIBRARIES}
-    ${ELASTICLIENT_LIBRARY}
     ${JSONCPP_LIBRARY}
     ${Protobuf_LIBRARIES}  # 链接protobuf库
     ${OPENSSL_LIBRARIES}  # 链接OpenSSL库
-    ${CPR_LIBRARY}  # 链接cpr库
-) 
+)

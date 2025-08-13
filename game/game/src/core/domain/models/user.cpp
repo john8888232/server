@@ -1,21 +1,21 @@
 #include "user.h"
 
-User::User(int64_t playerId, 
-           int avatarId, 
+User::User(uint64_t playerId, 
+           const std::string& avatarUrl, 
            const std::string& loginName, 
-          const std::string& username,
+           const std::string& username,
            const std::string& nickName, 
            double amount, 
-           int vipLevel, 
            const std::string& currency,
-           Status playerStatus)
+           Status playerStatus,
+           int merchantId)
     : playerId_(playerId),
-      avatarId_(avatarId),
+      avatarUrl_(avatarUrl),
       loginName_(loginName),
       username_(username),
       nickName_(nickName),
       amount_(amount),
-      vipLevel_(vipLevel),
       currency_(currency),
-      playerStatus_(playerStatus) {
+      playerStatus_(playerStatus),
+      merchantId_(merchantId) {
 }
